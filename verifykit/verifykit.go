@@ -73,6 +73,19 @@ type Report struct {
 	AssuranceMultiplier float64 `json:"assuranceMultiplier"`
 	Tier                string  `json:"tier"`
 
+	// platform-review-3 Epic 2: the layered verification truth, identical
+	// to the fields the Nexus proof inspector surfaces. CryptographicallyVerified
+	// is the offline binding gate; L0Verified is the live anchor
+	// confirmation; ReplayAvailable/ReplayVerified report deterministic
+	// replay; SemanticVerified means the operation re-executed to the same
+	// outcome; FullyVerified requires crypto + (L0 when anchored) + replay.
+	CryptographicallyVerified bool `json:"cryptographicallyVerified"`
+	L0Verified                bool `json:"l0Verified"`
+	ReplayAvailable           bool `json:"replayAvailable"`
+	ReplayVerified            bool `json:"replayVerified"`
+	SemanticVerified          bool `json:"semanticVerified"`
+	FullyVerified             bool `json:"fullyVerified"`
+
 	Checks []Check       `json:"checks"`
 	Replay *ReplayResult `json:"replay,omitempty"`
 
@@ -148,6 +161,13 @@ type Options struct {
 	// downgrading the cryptographic verdict.
 	Replay         bool
 	ReplayProvider ReplayProvider
+
+	// RequireReplay fails verification closed unless deterministic replay
+	// is available AND reproduces the recorded outcome. platform-review-3
+	// Epic 2: public-production bundles require replay by default. When
+	// false, an unavailable replay is reported but does not downgrade the
+	// cryptographic / L0 verdict (legacy behaviour).
+	RequireReplay bool
 }
 
 // Verify runs the full verification pipeline against a portable evidence
@@ -201,17 +221,61 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	// 9-11. Live L0 confirmation — fetch the anchor tx directly from L0.
 	l0Confirmed := report.checkL0Anchor(ctx, &bundle, anchored, opts.L0Confirmer)
 
-	// 12-14. Classify achieved assurance.
+	// crypto verdict = every check so far passed (these are all the
+	// offline cryptographic + structural bindings; L0 is separate).
+	report.CryptographicallyVerified = !report.hasFailuresExcept("l0_anchor")
+
+	// 15. Deterministic replay. Runs before finalize so a required-but-
+	//     unavailable replay (or a replay that produced a divergent
+	//     outcome) is counted as a failure in the overall verdict.
+	if opts.Replay || opts.RequireReplay {
+		report.Replay = runReplay(ctx, pkg, &bundle, opts.ReplayProvider)
+		report.applyReplayChecks(opts.RequireReplay)
+	}
+
+	// 12-14. Classify achieved assurance + finalize the verdict.
 	proof := computeProofLevel(anchored, l0Confirmed)
 	gov := computeGovernanceLevel(&bundle, bundleParsed)
 	report.finalizeLevels(proof, gov, opts.Require)
 
-	// 15. Optional deterministic replay (never downgrades the verdict).
-	if opts.Replay {
-		report.Replay = runReplay(ctx, pkg, &bundle, opts.ReplayProvider)
+	// Derived layered-verification flags (mirror the Nexus inspector).
+	report.L0Verified = l0Confirmed
+	report.ReplayAvailable = report.Replay != nil && report.Replay.Available
+	report.ReplayVerified = report.Replay != nil && report.Replay.Available && report.Replay.Matched
+	report.SemanticVerified = report.ReplayVerified
+	report.FullyVerified = report.CryptographicallyVerified && report.ReplayVerified
+	if anchored {
+		report.FullyVerified = report.FullyVerified && report.L0Verified
 	}
 
 	return report
+}
+
+// applyReplayChecks turns the replay result into pass/fail/skip checks.
+// A replay that ran and produced a divergent outcome is always a
+// failure. An unavailable replay fails only when requireReplay is set;
+// otherwise it is a skip that does not downgrade the verdict (legacy
+// behaviour for bundles without replay material).
+func (r *Report) applyReplayChecks(requireReplay bool) {
+	res := r.Replay
+	switch {
+	case res == nil:
+		if requireReplay {
+			r.add("replay_required", CheckFail, "deterministic replay required but not attempted")
+		}
+	case res.Available && res.Matched:
+		r.add("replay", CheckPass, res.Detail)
+	case res.Available && !res.Matched:
+		// Replay ran and the operation did NOT reproduce — a genuine
+		// semantic failure regardless of whether replay was required.
+		r.add("replay", CheckFail, res.Detail)
+	default: // unavailable
+		if requireReplay {
+			r.add("replay_required", CheckFail, res.Detail)
+		} else {
+			r.add("replay", CheckSkip, res.Detail)
+		}
+	}
 }
 
 // add appends a check.
@@ -225,6 +289,26 @@ func (r *Report) hasFailures() bool {
 		if c.Status == CheckFail {
 			return true
 		}
+	}
+	return false
+}
+
+// hasFailuresExcept reports whether any check other than the named ones
+// failed. Used to compute CryptographicallyVerified (every binding
+// except the live-L0 confirmation).
+func (r *Report) hasFailuresExcept(except ...string) bool {
+	skip := make(map[string]struct{}, len(except))
+	for _, n := range except {
+		skip[n] = struct{}{}
+	}
+	for _, c := range r.Checks {
+		if c.Status != CheckFail {
+			continue
+		}
+		if _, ok := skip[c.Name]; ok {
+			continue
+		}
+		return true
 	}
 	return false
 }

@@ -31,12 +31,19 @@ type ReplayMaterial struct {
 // Complete reports whether every replay input is present. Replay refuses
 // to run on partial material — a half-replay would produce a misleading
 // verdict.
+//
+// platform-review-3 Epic 2: contract bytecode is no longer a hard
+// requirement, because not every governed operation is a contract
+// execution (escrow/approval flows have no bytecode). Replay requires the
+// plugin inventory, a pre-execution state snapshot, and the deterministic
+// inputs — the material common to every replayable operation. A contract
+// flow still carries bytecode; its absence simply no longer blocks
+// replay of a non-contract flow.
 func (m *ReplayMaterial) Complete() bool {
 	if m == nil {
 		return false
 	}
-	return len(m.ContractBytecode) > 0 &&
-		len(m.PluginInventory) > 0 &&
+	return len(m.PluginInventory) > 0 &&
 		len(m.StateSnapshot) > 0 &&
 		len(m.DeterministicInputs) > 0
 }

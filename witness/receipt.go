@@ -136,6 +136,30 @@ type Expected struct {
 	// this many seconds — an operator policy that a witness attestation must
 	// be recent. 0 means no maximum age (archived proofs verify forever).
 	MaxAgeSeconds int64
+
+	// WitnessOperators maps a witness identity (ADI) to the ID of the
+	// independent ORGANIZATION that operates it. Supplied by the verifier from
+	// an external witness registry so independence is judged by DISTINCT
+	// OPERATORS, not distinct keys — one organisation cannot satisfy a quorum
+	// by running N identities. When nil, each identity is its own operator
+	// (backward-compatible: distinct identity == distinct operator).
+	WitnessOperators map[string]string
+	// RequireRegisteredWitnesses, when true, counts ONLY witnesses whose
+	// identity appears in WitnessOperators (i.e. a registered, approved
+	// independent operator). Ad-hoc witnesses are rejected, not counted.
+	RequireRegisteredWitnesses bool
+}
+
+// operatorOf resolves the operating organisation for a witness identity from
+// the registry, returning (operatorID, registered).
+func (exp Expected) operatorOf(identity string) (string, bool) {
+	if exp.WitnessOperators != nil {
+		if op, ok := exp.WitnessOperators[identity]; ok {
+			return op, true
+		}
+		return "", false
+	}
+	return identity, true // no registry: identity is its own operator
 }
 
 // KeyPageAuthorization is the result of confirming a witness's signing key is
@@ -214,6 +238,13 @@ type Evaluation struct {
 	// DuplicateIdentities lists identities that appeared more than once
 	// (only the first is counted).
 	DuplicateIdentities []string
+	// DistinctOperators is the number of distinct independent OPERATORS among
+	// the valid witnesses (resolved via the registry). This is the real
+	// independence measure: a 2-of-3 quorum must span 2 distinct operators,
+	// not 2 identities owned by one operator.
+	DistinctOperators int
+	// Operators lists the distinct operator IDs that attested.
+	Operators []string
 	// Rejected maps a receipt index to why it was rejected.
 	Rejected map[int]string
 }
@@ -239,6 +270,7 @@ func Evaluate(receipts []Receipt, exp Expected) Evaluation {
 func EvaluateAuthorized(receipts []Receipt, exp Expected, authorizer KeyPageAuthorizer) Evaluation {
 	ev := Evaluation{Rejected: map[int]string{}}
 	seen := map[string]bool{}
+	seenOp := map[string]bool{}
 	for i := range receipts {
 		r := &receipts[i]
 		if err := r.Validate(exp); err != nil {
@@ -259,6 +291,14 @@ func EvaluateAuthorized(receipts []Receipt, exp Expected, authorizer KeyPageAuth
 				continue
 			}
 		}
+		// Operator independence: a witness counts only if its operating
+		// organisation is known (when a registry requires registration), and
+		// distinct operators are tracked separately from distinct identities.
+		operator, registered := exp.operatorOf(r.WitnessIdentity)
+		if exp.RequireRegisteredWitnesses && !registered {
+			ev.Rejected[i] = "witness identity " + r.WitnessIdentity + " is not a registered independent operator"
+			continue
+		}
 		if seen[r.WitnessIdentity] {
 			ev.DuplicateIdentities = append(ev.DuplicateIdentities, r.WitnessIdentity)
 			ev.Rejected[i] = "duplicate witness identity " + r.WitnessIdentity
@@ -267,8 +307,14 @@ func EvaluateAuthorized(receipts []Receipt, exp Expected, authorizer KeyPageAuth
 		seen[r.WitnessIdentity] = true
 		ev.DistinctIdentities = append(ev.DistinctIdentities, r.WitnessIdentity)
 		ev.ValidCount++
+		if !seenOp[operator] {
+			seenOp[operator] = true
+			ev.Operators = append(ev.Operators, operator)
+		}
 	}
 	sort.Strings(ev.DistinctIdentities)
+	sort.Strings(ev.Operators)
+	ev.DistinctOperators = len(ev.Operators)
 	return ev
 }
 
@@ -276,6 +322,13 @@ func EvaluateAuthorized(receipts []Receipt, exp Expected, authorizer KeyPageAuth
 // count. A threshold of 0 is always met.
 func (e Evaluation) ThresholdMet(minWitnesses int) bool {
 	return e.ValidCount >= minWitnesses
+}
+
+// OperatorThresholdMet reports whether the valid witnesses span at least
+// minOperators distinct independent operators — the real independence gate.
+// A threshold of 0 is always met.
+func (e Evaluation) OperatorThresholdMet(minOperators int) bool {
+	return e.DistinctOperators >= minOperators
 }
 
 // HashBytes is the canonical sha256-hex of arbitrary bytes (used to

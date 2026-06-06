@@ -171,6 +171,60 @@ func TestValidateRejectsFutureReceipt(t *testing.T) {
 	}
 }
 
+func TestOperatorDiversityCountsDistinctOperators(t *testing.T) {
+	r1 := signReceipt(t, "acc://w1.acme", "acc://w1.acme/book/1", 1_700_000_000, nil)
+	r2 := signReceipt(t, "acc://w2.acme", "acc://w2.acme/book/1", 1_700_000_000, nil)
+	exp := baseExpected()
+	exp.WitnessOperators = map[string]string{
+		"acc://w1.acme": "org-alpha",
+		"acc://w2.acme": "org-beta",
+	}
+	ev := Evaluate([]Receipt{r1, r2}, exp)
+	if ev.ValidCount != 2 || ev.DistinctOperators != 2 {
+		t.Fatalf("two witnesses from two operators: valid=%d operators=%d", ev.ValidCount, ev.DistinctOperators)
+	}
+	if !ev.OperatorThresholdMet(2) {
+		t.Error("2 distinct operators should meet operator threshold 2")
+	}
+}
+
+func TestOperatorDiversitySameOperatorDoesNotDiversify(t *testing.T) {
+	// Two DISTINCT identities, but one operator runs both → 2 valid receipts
+	// but only 1 independent operator → operator threshold 2 NOT met.
+	r1 := signReceipt(t, "acc://w1.acme", "acc://w1.acme/book/1", 1_700_000_000, nil)
+	r2 := signReceipt(t, "acc://w2.acme", "acc://w2.acme/book/1", 1_700_000_000, nil)
+	exp := baseExpected()
+	exp.WitnessOperators = map[string]string{
+		"acc://w1.acme": "org-alpha",
+		"acc://w2.acme": "org-alpha", // same operator
+	}
+	ev := Evaluate([]Receipt{r1, r2}, exp)
+	if ev.ValidCount != 2 {
+		t.Fatalf("both identities valid: %d", ev.ValidCount)
+	}
+	if ev.DistinctOperators != 1 {
+		t.Fatalf("one operator running two identities must collapse to 1 operator, got %d", ev.DistinctOperators)
+	}
+	if ev.OperatorThresholdMet(2) {
+		t.Error("one operator must NOT satisfy a 2-operator independence quorum")
+	}
+}
+
+func TestRequireRegisteredWitnessesRejectsUnregistered(t *testing.T) {
+	registered := signReceipt(t, "acc://w1.acme", "acc://w1.acme/book/1", 1_700_000_000, nil)
+	adhoc := signReceipt(t, "acc://random.acme", "acc://random.acme/book/1", 1_700_000_000, nil)
+	exp := baseExpected()
+	exp.WitnessOperators = map[string]string{"acc://w1.acme": "org-alpha"}
+	exp.RequireRegisteredWitnesses = true
+	ev := Evaluate([]Receipt{registered, adhoc}, exp)
+	if ev.ValidCount != 1 {
+		t.Fatalf("only the registered witness should count, got %d", ev.ValidCount)
+	}
+	if ev.DistinctOperators != 1 {
+		t.Errorf("one registered operator, got %d", ev.DistinctOperators)
+	}
+}
+
 func TestValidateRejectsMissingKeyPage(t *testing.T) {
 	rc := signReceipt(t, "acc://w1.acme", "", 1_700_000_000, nil)
 	if err := rc.Validate(baseExpected()); err == nil {

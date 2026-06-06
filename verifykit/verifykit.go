@@ -97,6 +97,11 @@ type Report struct {
 	WitnessThresholdMet       bool `json:"witnessThresholdMet"`
 	WitnessCount              int  `json:"witnessCount"`
 	IndependentReplayVerified bool `json:"independentReplayVerified"`
+	// WitnessOperatorCount is the number of DISTINCT independent operators the
+	// valid witnesses span (independence, not just distinct keys);
+	// WitnessOperatorThresholdMet is true when it meets RequireWitnessOperators.
+	WitnessOperatorCount        int  `json:"witnessOperatorCount"`
+	WitnessOperatorThresholdMet bool `json:"witnessOperatorThresholdMet"`
 
 	Checks []Check       `json:"checks"`
 	Replay *ReplayResult `json:"replay,omitempty"`
@@ -200,6 +205,18 @@ type Options struct {
 	// NowUnix > 0. 0 disables freshness (archived proofs verify forever).
 	WitnessNowUnix              int64
 	WitnessReceiptMaxAgeSeconds int64
+
+	// WitnessOperators maps each witness identity to the independent operator
+	// (organisation) that runs it — from an external witness registry. It lets
+	// the verifier judge independence by DISTINCT OPERATORS, not distinct keys.
+	WitnessOperators map[string]string
+	// RequireRegisteredWitnesses counts only witnesses present in
+	// WitnessOperators (approved independent operators); ad-hoc witnesses are
+	// rejected.
+	RequireRegisteredWitnesses bool
+	// RequireWitnessOperators fails verification closed unless the valid
+	// witnesses span at least this many DISTINCT independent operators.
+	RequireWitnessOperators int
 }
 
 // Verify runs the full verification pipeline against a portable evidence
@@ -265,8 +282,16 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 		report.applyReplayChecks(opts.RequireReplay)
 	}
 
-	// 16. Independent witness receipts (platform-review-3 Epic 5).
-	report.evaluateWitnesses(pkg, &bundle, anchored, opts.RequireWitnessThreshold, opts.WitnessKeyPageAuthorizer, opts.WitnessNowUnix, opts.WitnessReceiptMaxAgeSeconds)
+	// 16. Independent witness receipts (platform-review-3 Epic 5 + hardening).
+	report.evaluateWitnesses(pkg, &bundle, anchored, witnessGate{
+		authorizer:        opts.WitnessKeyPageAuthorizer,
+		nowUnix:           opts.WitnessNowUnix,
+		maxAgeSeconds:     opts.WitnessReceiptMaxAgeSeconds,
+		requireThreshold:  opts.RequireWitnessThreshold,
+		operators:         opts.WitnessOperators,
+		requireRegistered: opts.RequireRegisteredWitnesses,
+		requireOperators:  opts.RequireWitnessOperators,
+	})
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
 	proof := computeProofLevel(anchored, l0Confirmed)

@@ -86,6 +86,17 @@ type Report struct {
 	SemanticVerified          bool `json:"semanticVerified"`
 	FullyVerified             bool `json:"fullyVerified"`
 
+	// platform-review-3 Epic 5: independent witness network. WitnessCount
+	// is the number of distinct valid witnesses; WitnessThresholdMet is
+	// true when that count meets the required threshold; WitnessVerified
+	// is true when at least one valid witness attested; and
+	// IndependentReplayVerified is true when an independent witness (not
+	// this verifier) reproduced the outcome.
+	WitnessVerified           bool `json:"witnessVerified"`
+	WitnessThresholdMet       bool `json:"witnessThresholdMet"`
+	WitnessCount              int  `json:"witnessCount"`
+	IndependentReplayVerified bool `json:"independentReplayVerified"`
+
 	Checks []Check       `json:"checks"`
 	Replay *ReplayResult `json:"replay,omitempty"`
 
@@ -168,6 +179,12 @@ type Options struct {
 	// false, an unavailable replay is reported but does not downgrade the
 	// cryptographic / L0 verdict (legacy behaviour).
 	RequireReplay bool
+
+	// RequireWitnessThreshold fails verification closed unless at least
+	// this many DISTINCT valid witnesses attested the bundle reproduces.
+	// 0 means witness receipts are evaluated and reported but not
+	// required. platform-review-3 Epic 5.
+	RequireWitnessThreshold int
 }
 
 // Verify runs the full verification pipeline against a portable evidence
@@ -232,6 +249,9 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 		report.Replay = runReplay(ctx, pkg, &bundle, opts.ReplayProvider)
 		report.applyReplayChecks(opts.RequireReplay)
 	}
+
+	// 16. Independent witness receipts (platform-review-3 Epic 5).
+	report.evaluateWitnesses(pkg, &bundle, anchored, opts.RequireWitnessThreshold)
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
 	proof := computeProofLevel(anchored, l0Confirmed)

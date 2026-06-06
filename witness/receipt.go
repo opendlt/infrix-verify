@@ -119,11 +119,58 @@ func (r *Receipt) VerifySignature() error {
 	return nil
 }
 
+// WitnessClockSkewSeconds is the tolerated forward clock skew for a witness
+// receipt timestamp relative to the verifier's reference time.
+const WitnessClockSkewSeconds = 300
+
 // Expected carries the bundle facts a valid receipt must commit to.
 type Expected struct {
 	OutcomeHash       string // hex of the bundle OutcomeDigest
 	ReplayCapsuleHash string // sha256 hex of the package replay capsule bytes
 	L0AnchorTxHash    string // bundle anchor tx hash (empty when unanchored)
+
+	// NowUnix is the verifier's reference time. When > 0 it enables the
+	// freshness checks below (and the forward-skew guard); 0 disables them.
+	NowUnix int64
+	// MaxAgeSeconds, when > 0 (and NowUnix > 0), rejects receipts older than
+	// this many seconds — an operator policy that a witness attestation must
+	// be recent. 0 means no maximum age (archived proofs verify forever).
+	MaxAgeSeconds int64
+}
+
+// KeyPageAuthorization is the result of confirming a witness's signing key is
+// authorized on the witness's declared L0 key page.
+type KeyPageAuthorization struct {
+	// Authorized is true when the witness public key's hash is a current key
+	// on the declared key page.
+	Authorized bool
+	// Revoked is true when the key page exists but the witness key is NOT on
+	// it (the page was found, the key was removed/never present) — a stronger,
+	// more actionable signal than a bare lookup failure.
+	Revoked bool
+	// Detail is a human-readable explanation.
+	Detail string
+}
+
+// KeyPageAuthorizer confirms that a witness's signing key is authorized on
+// the witness's declared L0 key page. A live implementation queries L0; the
+// witness package stays a leaf by depending only on this interface.
+type KeyPageAuthorizer interface {
+	Authorize(keyPageURL string, publicKey []byte) (KeyPageAuthorization, error)
+}
+
+// CheckFreshness validates the receipt timestamp against exp's reference time.
+func (r *Receipt) CheckFreshness(exp Expected) error {
+	if exp.NowUnix <= 0 {
+		return nil
+	}
+	if r.Timestamp > exp.NowUnix+WitnessClockSkewSeconds {
+		return fmt.Errorf("witness: receipt timestamp %d is in the future (now=%d, skew=%ds)", r.Timestamp, exp.NowUnix, WitnessClockSkewSeconds)
+	}
+	if exp.MaxAgeSeconds > 0 && exp.NowUnix-r.Timestamp > exp.MaxAgeSeconds {
+		return fmt.Errorf("witness: receipt is stale (age %ds exceeds max %ds)", exp.NowUnix-r.Timestamp, exp.MaxAgeSeconds)
+	}
+	return nil
 }
 
 // Validate checks a single receipt against the expected bundle facts: the
@@ -151,7 +198,10 @@ func (r *Receipt) Validate(exp Expected) error {
 	if r.WitnessIdentity == "" {
 		return fmt.Errorf("witness: receipt has no witness identity")
 	}
-	return nil
+	if r.WitnessKeyPage == "" {
+		return fmt.Errorf("witness: receipt has no witness key page")
+	}
+	return r.CheckFreshness(exp)
 }
 
 // Evaluation is the outcome of checking a set of receipts against a bundle.
@@ -171,7 +221,22 @@ type Evaluation struct {
 // Evaluate validates every receipt against the expected bundle facts,
 // deduplicates by witness identity (a witness cannot vote twice), and
 // reports the count of distinct valid witnesses. platform-review-3 Epic 5.
+// This is the offline form (Ed25519 + cross-binding + freshness only); use
+// EvaluateAuthorized to additionally require live L0 key-page authorization.
 func Evaluate(receipts []Receipt, exp Expected) Evaluation {
+	return EvaluateAuthorized(receipts, exp, nil)
+}
+
+// EvaluateAuthorized is Evaluate plus, when authorizer is non-nil, a hard
+// requirement that each receipt's signing key is authorized on its declared
+// L0 key page (and not revoked). A receipt that passes every offline check
+// but whose key page does not authorize its key — or whose key was removed
+// (revoked) — is rejected and does NOT count toward the threshold. This is
+// what makes a witness meaningfully independent: possession of an Ed25519 key
+// is not enough; the key must be a live, authorized member of the witness's
+// L0 identity. A key-page lookup ERROR is fail-closed (the receipt is
+// rejected) so a witness cannot be counted while its authorization is unknown.
+func EvaluateAuthorized(receipts []Receipt, exp Expected, authorizer KeyPageAuthorizer) Evaluation {
 	ev := Evaluation{Rejected: map[int]string{}}
 	seen := map[string]bool{}
 	for i := range receipts {
@@ -179,6 +244,20 @@ func Evaluate(receipts []Receipt, exp Expected) Evaluation {
 		if err := r.Validate(exp); err != nil {
 			ev.Rejected[i] = err.Error()
 			continue
+		}
+		if authorizer != nil {
+			authz, err := authorizer.Authorize(r.WitnessKeyPage, r.PublicKey)
+			switch {
+			case err != nil:
+				ev.Rejected[i] = "key-page authorization error (fail-closed): " + err.Error()
+				continue
+			case authz.Revoked:
+				ev.Rejected[i] = "witness key revoked on key page " + r.WitnessKeyPage + ": " + authz.Detail
+				continue
+			case !authz.Authorized:
+				ev.Rejected[i] = "witness key not authorized on key page " + r.WitnessKeyPage + ": " + authz.Detail
+				continue
+			}
 		}
 		if seen[r.WitnessIdentity] {
 			ev.DuplicateIdentities = append(ev.DuplicateIdentities, r.WitnessIdentity)

@@ -20,18 +20,20 @@ import (
 // witness report fields. When requireThreshold > 0 and the distinct valid
 // witness count does not meet it, a failed check is added so verification
 // fails closed. platform-review-3 Epic 5.
-func (r *Report) evaluateWitnesses(pkg *evidence.PortableEvidencePackage, bundle *evidence.EvidenceBundle, anchored bool, requireThreshold int) {
+func (r *Report) evaluateWitnesses(pkg *evidence.PortableEvidencePackage, bundle *evidence.EvidenceBundle, anchored bool, requireThreshold int, authorizer witness.KeyPageAuthorizer, nowUnix, maxAgeSeconds int64) {
 	receipts := decodeReceipts(pkg)
 
 	exp := witness.Expected{
 		OutcomeHash:       hex.EncodeToString(pkg.OutcomeDigest[:]),
 		ReplayCapsuleHash: capsuleHash(pkg),
+		NowUnix:           nowUnix,
+		MaxAgeSeconds:     maxAgeSeconds,
 	}
 	if anchored {
 		exp.L0AnchorTxHash = bundle.AnchorTxHash
 	}
 
-	ev := witness.Evaluate(receipts, exp)
+	ev := witness.EvaluateAuthorized(receipts, exp, authorizer)
 	r.WitnessCount = ev.ValidCount
 	r.WitnessVerified = ev.ValidCount > 0
 	r.IndependentReplayVerified = ev.ValidCount > 0

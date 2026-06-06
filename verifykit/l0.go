@@ -7,16 +7,20 @@
 package verifykit
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	accprotocol "gitlab.com/accumulatenetwork/accumulate/protocol"
+	accurl "gitlab.com/accumulatenetwork/accumulate/pkg/url"
 
 	"github.com/AccumulateNetwork/infrix/pkg/evidence"
 	l0pkg "github.com/AccumulateNetwork/infrix/pkg/l0"
+	"github.com/AccumulateNetwork/infrix/pkg/witness"
 )
 
 // L0AnchorConfirmation is the result of an independent live L0 lookup of
@@ -165,5 +169,47 @@ func matchBatchEntry(entry []byte, expectBundleID string, expectBundleHash [32]b
 	return false
 }
 
-// compile-time assertion.
-var _ L0AnchorConfirmer = (*NativeL0Confirmer)(nil)
+// Authorize implements witness.KeyPageAuthorizer: it confirms a witness's
+// signing key is a current, authorized key on the witness's declared L0 key
+// page. The Accumulate key hash for an Ed25519 key is sha256(publicKey); the
+// page authorizes the key iff that hash matches one of the page's key entries.
+// A page that is found but does not contain the key is reported Revoked (the
+// stronger signal); a missing/unreadable page is a fail-closed error.
+func (c *NativeL0Confirmer) Authorize(keyPageURL string, publicKey []byte) (witness.KeyPageAuthorization, error) {
+	pageStr := strings.TrimSpace(keyPageURL)
+	if pageStr == "" {
+		return witness.KeyPageAuthorization{}, fmt.Errorf("verifykit: witness receipt has no key page")
+	}
+	if len(publicKey) == 0 {
+		return witness.KeyPageAuthorization{}, fmt.Errorf("verifykit: witness receipt has no public key")
+	}
+	u, err := accurl.Parse(pageStr)
+	if err != nil {
+		return witness.KeyPageAuthorization{}, fmt.Errorf("verifykit: parse witness key page %q: %w", pageStr, err)
+	}
+	page, err := c.client.GetKeyPage(context.Background(), u)
+	if err != nil {
+		// Fail-closed: an unreadable key page means authorization is unknown.
+		return witness.KeyPageAuthorization{}, fmt.Errorf("verifykit: query witness key page %q: %w", pageStr, err)
+	}
+	keyHash := sha256.Sum256(publicKey)
+	for _, k := range page.Keys {
+		if bytes.Equal(k.PublicKeyHash, keyHash[:]) {
+			return witness.KeyPageAuthorization{
+				Authorized: true,
+				Detail:     "witness key is an authorized entry on " + pageStr,
+			}, nil
+		}
+	}
+	// The page exists but the witness key is not on it: revoked / never added.
+	return witness.KeyPageAuthorization{
+		Revoked: true,
+		Detail:  fmt.Sprintf("witness key hash %s is not among the %d key(s) on %s", hex.EncodeToString(keyHash[:8]), len(page.Keys), pageStr),
+	}, nil
+}
+
+// compile-time assertions.
+var (
+	_ L0AnchorConfirmer        = (*NativeL0Confirmer)(nil)
+	_ witness.KeyPageAuthorizer = (*NativeL0Confirmer)(nil)
+)

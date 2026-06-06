@@ -25,6 +25,7 @@ import (
 
 	"github.com/AccumulateNetwork/infrix/pkg/assurance"
 	"github.com/AccumulateNetwork/infrix/pkg/evidence"
+	"github.com/AccumulateNetwork/infrix/pkg/witness"
 )
 
 // CheckStatus is the per-check outcome.
@@ -185,6 +186,20 @@ type Options struct {
 	// 0 means witness receipts are evaluated and reported but not
 	// required. platform-review-3 Epic 5.
 	RequireWitnessThreshold int
+
+	// WitnessKeyPageAuthorizer, when non-nil, makes witness counting require
+	// live L0 key-page authorization: each receipt's signing key must be a
+	// current, authorized key on the witness's declared key page (not merely
+	// a held Ed25519 key). Receipts that fail authorization — or whose key
+	// was revoked — do not count. A lookup error is fail-closed.
+	WitnessKeyPageAuthorizer witness.KeyPageAuthorizer
+
+	// WitnessNowUnix / WitnessReceiptMaxAgeSeconds enable receipt freshness.
+	// When MaxAge > 0 (and NowUnix > 0) a witness receipt older than MaxAge
+	// is rejected as stale; a future-dated receipt is always rejected when
+	// NowUnix > 0. 0 disables freshness (archived proofs verify forever).
+	WitnessNowUnix              int64
+	WitnessReceiptMaxAgeSeconds int64
 }
 
 // Verify runs the full verification pipeline against a portable evidence
@@ -251,7 +266,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	}
 
 	// 16. Independent witness receipts (platform-review-3 Epic 5).
-	report.evaluateWitnesses(pkg, &bundle, anchored, opts.RequireWitnessThreshold)
+	report.evaluateWitnesses(pkg, &bundle, anchored, opts.RequireWitnessThreshold, opts.WitnessKeyPageAuthorizer, opts.WitnessNowUnix, opts.WitnessReceiptMaxAgeSeconds)
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
 	proof := computeProofLevel(anchored, l0Confirmed)

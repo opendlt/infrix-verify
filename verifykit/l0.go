@@ -73,6 +73,32 @@ func NewNativeL0Confirmer(endpoint string) (*NativeL0Confirmer, error) {
 	return &NativeL0Confirmer{client: client}, nil
 }
 
+// FetchWriteDataPayload fetches an L0 transaction by hash and returns the
+// decoded WriteData entry payload (the bytes written on-chain), confirming the
+// transaction is delivered. It is the generic primitive the release verifier
+// uses to prove a package's evidence-root anchor commits to the package — the
+// payload is the release-evidence anchor JSON ({commit, evidenceRootSha256,
+// network, …}). Returns an error when the tx is missing, not delivered, or
+// carries no WriteData entry.
+func (c *NativeL0Confirmer) FetchWriteDataPayload(ctx context.Context, txHash string) ([]byte, error) {
+	raw := strings.TrimPrefix(strings.TrimSpace(txHash), "0x")
+	hashBytes, err := hex.DecodeString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("verifykit: tx hash %q is not hex: %w", txHash, err)
+	}
+	if len(hashBytes) != 32 {
+		return nil, fmt.Errorf("verifykit: tx hash must be 32 bytes, got %d", len(hashBytes))
+	}
+	resp, err := c.client.GetTransaction(ctx, hashBytes)
+	if err != nil {
+		return nil, fmt.Errorf("verifykit: query L0 tx %s: %w", raw, err)
+	}
+	if !resp.Delivered {
+		return nil, fmt.Errorf("verifykit: L0 tx %s present but not delivered", raw)
+	}
+	return extractWriteDataEntry(resp)
+}
+
 // ConfirmAnchor implements L0AnchorConfirmer.
 func (c *NativeL0Confirmer) ConfirmAnchor(ctx context.Context, txHash, expectBundleID string, expectBundleHash [32]byte, expectBlock uint64) (*L0AnchorConfirmation, error) {
 	raw := strings.TrimPrefix(strings.TrimSpace(txHash), "0x")

@@ -7,8 +7,8 @@
 package verifykit
 
 import (
-	"github.com/AccumulateNetwork/infrix/pkg/assurance"
-	"github.com/AccumulateNetwork/infrix/pkg/evidence"
+	"github.com/AccumulateNetwork/infrix-schema/assurance"
+	"github.com/AccumulateNetwork/infrix-schema/evidence"
 )
 
 // computeProofLevel maps the verified anchor state onto the canonical

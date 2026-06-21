@@ -30,27 +30,43 @@ import (
 // Transitive check (`go list -deps`), so a leak through ANY new intermediate
 // import is caught, not just a direct import.
 func TestVerifierCoreHasNoRuntimeNodeDependency(t *testing.T) {
-	forbidden := []string{
-		"github.com/AccumulateNetwork/infrix/pkg/l0",
-		"github.com/AccumulateNetwork/infrix/pkg/production",
-		"github.com/AccumulateNetwork/infrix/pkg/devnet",
+	const corePrefix = "github.com/AccumulateNetwork/infrix/pkg/"
+
+	// Allowlist (not a forbidden-list): the verifier core may import ONLY these
+	// main-module packages. Everything else verification-side now lives in the
+	// infrix-schema module (evidence wire format + assurance ladder) or is
+	// injected through a port (l0native adapter). M4.2 dropped pkg/l0; the M4.3
+	// schema repoint then collapsed verifykit's main-module surface from ~18
+	// runtime packages (anchor, governance, objects, state, workflow, evidence,
+	// assurance, zkp, ...) down to this set. Any new main-module import that is
+	// not on the allowlist fails RED — that is the boundary that keeps the
+	// verifier independently extractable and provably node-free.
+	allowed := map[string]bool{
+		// witness is the independent-attestation interface set; it imports no
+		// other Infrix package. It is the last main-module dep and is slated to
+		// move into the verifier module / a schema leaf.
+		"github.com/AccumulateNetwork/infrix/pkg/witness": true,
 	}
 
 	out, err := exec.Command("go", "list", "-deps", "github.com/AccumulateNetwork/infrix/pkg/verifykit").CombinedOutput()
 	if err != nil {
 		t.Fatalf("go list -deps pkg/verifykit failed: %v\n%s", err, out)
 	}
-	deps := make(map[string]struct{})
+	var leaks []string
 	for _, line := range strings.Split(string(out), "\n") {
-		deps[strings.TrimSpace(line)] = struct{}{}
-	}
-	for _, f := range forbidden {
-		if _, ok := deps[f]; ok {
-			t.Errorf("pkg/verifykit transitively imports %s — the verifier core must stay free "+
-				"of the live node. L0 confirmation belongs behind the L0AnchorConfirmer port "+
-				"(the NativeL0Confirmer adapter lives in pkg/verifykit/l0native and is injected by "+
-				"the application). Move whatever pulled %s out of the core. (docs/extraction-plan M4.2)",
-				f, f)
+		dep := strings.TrimSpace(line)
+		if dep == "" || dep == "github.com/AccumulateNetwork/infrix/pkg/verifykit" {
+			continue
 		}
+		if strings.HasPrefix(dep, corePrefix) && !allowed[dep] {
+			leaks = append(leaks, dep)
+		}
+	}
+	if len(leaks) > 0 {
+		t.Errorf("the verifier core (pkg/verifykit) transitively imports %d disallowed main-module "+
+			"package(s): %s\nThe verifier must depend only on the infrix-schema module, crypto, the "+
+			"witness interface, and ports (L0 confirmation is injected via the l0native adapter). "+
+			"Move whatever pulled these into infrix-schema or behind a port. (docs/extraction-plan M4.2/M4.3)",
+			len(leaks), strings.Join(leaks, ", "))
 	}
 }

@@ -11,7 +11,7 @@ import (
 	"crypto/sha256"
 	"testing"
 
-	"github.com/AccumulateNetwork/infrix/pkg/evidence"
+	evidence "github.com/AccumulateNetwork/infrix-schema/evidence"
 )
 
 // fakeConfirmer is an injectable L0AnchorConfirmer for tests — it records
@@ -34,21 +34,39 @@ func (f *fakeConfirmer) ConfirmAnchor(_ context.Context, txHash, bundleID string
 // buildPortable builds a Full, anchored portable evidence package with
 // policy + approval + verified external-proof evidence (i.e. a G2-capable
 // bundle). anchored=false produces an unanchored Full bundle.
+//
+// It is built entirely from the stdlib-only infrix-schema/evidence primitives
+// (the format types + the canonical portable builder), NOT the runtime
+// EvidenceCollector/Exporter — so the verifier's tests depend only on the same
+// schema module the verifier core does (docs/extraction-plan, M4.3), with no
+// pull on the main module. Because BuildPortablePackageWithBindings and
+// VerifyPortablePackage are the matched halves of one wire contract, a package
+// built here verifies by construction; the tests then assert the verifier's
+// classification + tamper-detection on top of it.
 func buildPortable(t *testing.T, anchored bool) *evidence.PortableEvidencePackage {
 	t.Helper()
 	planHash := sha256.Sum256([]byte("vk-plan"))
-	c := evidence.NewCollector("intent-vk", evidence.EvidenceLevelFull)
-	c.AddIntent(map[string]string{"id": "intent-vk"})
-	c.AddPlan(map[string]string{"planId": "plan-vk"})
-	c.AddPolicyDecision(evidence.DecisionProofRef{PolicyType: "transfer", RuleID: "allow", Decision: "allow", BlockHeight: 1})
-	c.AddApprovalEvidence(evidence.ApprovalEvidenceRef{StageID: "s1", Identity: "acc://approver.acme", Role: "approver", PlanHash: planHash})
-	c.AddExternalProof(evidence.ExternalProofRef{SourceChain: "acc", ProofType: "groth16", Verified: true})
-	c.AddOutcome(map[string]string{"status": "success"}, "outcome-vk")
-	c.SetOutcomeDigest(sha256.Sum256([]byte("vk-outcome-canonical")))
-	c.SetSealedBlockHeight(100)
-	bundle, err := c.Finalize([32]byte{7}, "outcome-vk")
-	if err != nil {
-		t.Fatalf("Finalize: %v", err)
+	outcomeDigest := sha256.Sum256([]byte("vk-outcome-canonical"))
+
+	// Hash-linked evidence chain.
+	b := evidence.NewBuilder("intent-vk")
+	b.AddJSON("intent", map[string]string{"id": "intent-vk"}, "")
+	b.AddJSON("plan", map[string]string{"planId": "plan-vk"}, "plan-vk")
+	b.AddJSON("outcome", map[string]string{"status": "success"}, "outcome-vk")
+	chain := b.Build([32]byte{7})
+
+	bundle := &evidence.EvidenceBundle{
+		ID:                "bundle-vk",
+		IntentID:          "intent-vk",
+		PlanID:            "plan-vk",
+		Level:             evidence.EvidenceLevelFull,
+		Chain:             chain,
+		StateRoot:         [32]byte{7},
+		PolicyDecisions:   []evidence.DecisionProofRef{{PolicyType: "transfer", RuleID: "allow", Decision: "allow", BlockHeight: 1}},
+		ApprovalEvidence:  []evidence.ApprovalEvidenceRef{{StageID: "s1", Identity: "acc://approver.acme", Role: "approver", PlanHash: planHash}},
+		ExternalProofs:    []evidence.ExternalProofRef{{SourceChain: "acc", ProofType: "groth16", Verified: true}},
+		OutcomeDigest:     outcomeDigest,
+		SealedBlockHeight: 100,
 	}
 	if anchored {
 		bundle.Anchor = evidence.AnchorStatusAnchored
@@ -56,9 +74,46 @@ func buildPortable(t *testing.T, anchored bool) *evidence.PortableEvidencePackag
 		bundle.AnchorBlock = 4242
 		bundle.AnchorRecordID = "anchor-rec-vk"
 	}
-	pkg, err := (&evidence.Exporter{}).BuildPortableExport(bundle)
+	if err := bundle.Finalize(); err != nil {
+		t.Fatalf("bundle.Finalize: %v", err)
+	}
+
+	bundleData, err := evidence.CanonicalJSON(bundle)
 	if err != nil {
-		t.Fatalf("BuildPortableExport: %v", err)
+		t.Fatalf("canonicalize bundle: %v", err)
+	}
+
+	var inclusionProofs []evidence.MerkleInclusionProof
+	for i := range bundle.Chain.Links {
+		if proof, perr := evidence.GenerateMerkleInclusionProof(bundle, i); perr == nil && proof != nil {
+			inclusionProofs = append(inclusionProofs, *proof)
+		}
+	}
+
+	in := evidence.BuildPortablePackageInputs{
+		BundleData:      bundleData,
+		PlanHash:        planHash,
+		OutcomeDigest:   outcomeDigest,
+		InclusionProofs: inclusionProofs,
+		PolicyDecisions: bundle.PolicyDecisions,
+	}
+	if anchored {
+		in.AnchorProof = &evidence.EvidenceAnchorData{
+			Version:     2,
+			BundleID:    bundle.ID,
+			BundleHash:  bundle.BundleHash,
+			ChainHash:   bundle.Chain.ChainHash,
+			StateRoot:   bundle.StateRoot,
+			Level:       string(bundle.Level),
+			BlockHeight: bundle.AnchorBlock,
+		}
+		in.AnchorTxHash = bundle.AnchorTxHash
+		in.AnchorBlock = bundle.AnchorBlock
+	}
+
+	pkg, err := evidence.BuildPortablePackageWithBindings(in)
+	if err != nil {
+		t.Fatalf("BuildPortablePackageWithBindings: %v", err)
 	}
 	return pkg
 }

@@ -12,7 +12,7 @@ import (
 	"fmt"
 
 	"github.com/opendlt/infrix-schema/evidence"
-	"github.com/AccumulateNetwork/infrix/pkg/witness"
+	"github.com/AccumulateNetwork/infrix-verify/witness"
 )
 
 // witnessGate carries the witness-evaluation policy from Options.

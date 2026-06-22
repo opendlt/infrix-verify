@@ -45,7 +45,7 @@ func TestVerifierCoreHasNoRuntimeNodeDependency(t *testing.T) {
 		// witness is the independent-attestation interface set; it imports no
 		// other Infrix package. It is the last main-module dep and is slated to
 		// move into the verifier module / a schema leaf.
-		"github.com/AccumulateNetwork/infrix/pkg/witness": true,
+		"github.com/AccumulateNetwork/infrix-verify/witness": true,
 	}
 
 	out, err := exec.Command("go", "list", "-deps", "github.com/AccumulateNetwork/infrix/pkg/verifykit").CombinedOutput()

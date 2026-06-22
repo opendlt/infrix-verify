@@ -9,7 +9,7 @@ package verifykit
 import (
 	"context"
 
-	"github.com/AccumulateNetwork/infrix-schema/evidence"
+	"github.com/opendlt/infrix-schema/evidence"
 )
 
 // ReplayMaterial is the set of inputs deterministic replay needs to

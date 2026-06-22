@@ -11,7 +11,7 @@ import (
 	"crypto/sha256"
 	"testing"
 
-	evidence "github.com/AccumulateNetwork/infrix-schema/evidence"
+	evidence "github.com/opendlt/infrix-schema/evidence"
 )
 
 // fakeConfirmer is an injectable L0AnchorConfirmer for tests — it records

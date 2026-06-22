@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/AccumulateNetwork/infrix-schema/assurance"
-	"github.com/AccumulateNetwork/infrix-schema/evidence"
+	"github.com/opendlt/infrix-schema/assurance"
+	"github.com/opendlt/infrix-schema/evidence"
 	"github.com/AccumulateNetwork/infrix/pkg/witness"
 )
 

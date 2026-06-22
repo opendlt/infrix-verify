@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/AccumulateNetwork/infrix-schema/evidence"
+	"github.com/opendlt/infrix-schema/evidence"
 	"github.com/AccumulateNetwork/infrix/pkg/witness"
 )
 

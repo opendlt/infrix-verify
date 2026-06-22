@@ -8,3 +8,5 @@
 module github.com/AccumulateNetwork/infrix-verify
 
 go 1.25.7
+
+require github.com/opendlt/infrix-schema v0.1.0

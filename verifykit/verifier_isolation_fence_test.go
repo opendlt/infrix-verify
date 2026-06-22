@@ -36,7 +36,7 @@ import (
 func TestVerifierCoreHasNoRuntimeNodeDependency(t *testing.T) {
 	// Any dependency under the MAIN runtime module is forbidden. The trailing
 	// slash keeps this from matching the verifier's own module
-	// (github.com/AccumulateNetwork/infrix-verify/...), which is allowed.
+	// (github.com/opendlt/infrix-verify/...), which is allowed.
 	const runtimeModulePrefix = "github.com/AccumulateNetwork/infrix/"
 
 	// Empty allowlist: the verifier core may import ZERO packages from the main
@@ -44,7 +44,7 @@ func TestVerifierCoreHasNoRuntimeNodeDependency(t *testing.T) {
 	// format + assurance ladder), the in-module witness leaf, or behind a port.
 	allowed := map[string]bool{}
 
-	out, err := exec.Command("go", "list", "-deps", "github.com/AccumulateNetwork/infrix-verify/verifykit").CombinedOutput()
+	out, err := exec.Command("go", "list", "-deps", "github.com/opendlt/infrix-verify/verifykit").CombinedOutput()
 	if err != nil {
 		t.Fatalf("go list -deps infrix-verify/verifykit failed: %v\n%s", err, out)
 	}

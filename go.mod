@@ -5,7 +5,7 @@
 // library (enforced by the verifier-isolation fence) so it can be consumed as
 // an independent, versioned module with no trust in — and no compile-time
 // dependency on — the live node.
-module github.com/AccumulateNetwork/infrix-verify
+module github.com/opendlt/infrix-verify
 
 go 1.25.7
 

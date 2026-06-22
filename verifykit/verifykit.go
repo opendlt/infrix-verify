@@ -25,7 +25,7 @@ import (
 
 	"github.com/opendlt/infrix-schema/assurance"
 	"github.com/opendlt/infrix-schema/evidence"
-	"github.com/AccumulateNetwork/infrix-verify/witness"
+	"github.com/opendlt/infrix-verify/witness"
 )
 
 // CheckStatus is the per-check outcome.

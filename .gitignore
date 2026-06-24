@@ -1,0 +1,8 @@
+# Go build / test artifacts
+*.test
+*.out
+/vendor/
+
+# OS / editor
+.DS_Store
+*.log

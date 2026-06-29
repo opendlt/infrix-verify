@@ -1,6 +1,6 @@
 # infrix-verify
 
-**The node-free, offline proof verifier for [Infrix](https://github.com/opendlt/infrix-accumen).**
+**The node-free, offline proof verifier for [Infrix](https://github.com/opendlt).**
 
 `infrix-verify` is the Tier-1 verification module extracted from the Infrix
 monorepo. It independently checks an Infrix proof — a portable evidence package —

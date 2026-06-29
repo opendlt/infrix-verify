@@ -29,6 +29,12 @@ import (
 // receipt := proofreceipt.FromVerifyReport(rep, proofreceipt.VerifyConvertOptions{...})
 ```
 
+Prefer the command line? The same offline verification ships in the `infrix`
+CLI (`infrix verify <proof.json>`) — install it from
+[opendlt/infrix-cli](https://github.com/opendlt/infrix-cli) (`curl … | sh`,
+`iwr … | iex`, or `npx @infrix/cli`). For a zero-install browser/Node check, use
+[`@infrix/verify`](https://www.npmjs.com/package/@infrix/verify).
+
 ## Packages
 
 | Package | What it does |

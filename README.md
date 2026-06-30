@@ -2,6 +2,9 @@
 
 **The node-free, offline proof verifier for [Infrix](https://github.com/opendlt).**
 
+> See it in action: run a governed flow and verify its proof in your browser at
+> **https://play.infrix.opendlt.org** (this is the verifier it runs client-side).
+
 `infrix-verify` is the Tier-1 verification module extracted from the Infrix
 monorepo. It independently checks an Infrix proof — a portable evidence package —
 **without trusting the node that produced it**. It is the same verifier the

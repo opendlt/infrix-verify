@@ -43,8 +43,11 @@ func computeProofLevel(anchored, l0Confirmed bool) assurance.ProofLevel {
 //     and none of them denied.
 //   - G1 (threshold approved): G0 plus signed approval evidence bound to
 //     the plan hash.
-//   - G2 (credentialed + anchored): G1 plus a verified external/credential
-//     proof and an anchored bundle.
+//   - G2 (credentialed + anchored): G1 plus an INDEPENDENTLY verified
+//     credential proof and an anchored bundle. This offline kit cannot yet
+//     verify a credential independently (issuer-signature / status checking
+//     lands with the credverify leaf, DX P1-4), so it does NOT credit G2 from
+//     the self-asserted ExternalProofRef.Verified flag — see below.
 //   - ungoverned: anything less.
 func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool) assurance.GovernanceLevel {
 	if !parsed {
@@ -75,17 +78,16 @@ func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool) assura
 		return assurance.GovernanceLevelPolicyPassed
 	}
 
-	anchored := bundle.Anchor == evidence.AnchorStatusAnchored || bundle.Anchor == evidence.AnchorStatusVerified
-	hasCredentialProof := false
-	for _, ep := range bundle.ExternalProofs {
-		if ep.Verified {
-			hasCredentialProof = true
-			break
-		}
-	}
-	if hasCredentialProof && anchored {
-		return assurance.GovernanceLevelCredentialedAnchored
-	}
+	// G2 (credentialed + anchored) requires an INDEPENDENTLY verified
+	// credential proof. ExternalProofRef.Verified is a flag the producing node
+	// wrote into the bundle; crediting G2 from it would trust the node — the
+	// exact property this "no node trust" kit exists to refute (DX P0-5b).
+	// This kit does not yet perform independent credential verification
+	// (issuer-signature / status checking arrives with the credverify leaf,
+	// DX P1-4), so the strongest governance level it can honestly substantiate
+	// is G1. The anchor half of G2 IS independently confirmable
+	// (see computeProofLevel / L0Confirmer), but the credential half is not,
+	// so the combined G2 classification is withheld until P1-4.
 	return assurance.GovernanceLevelThresholdApproved
 }
 

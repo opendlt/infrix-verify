@@ -187,7 +187,14 @@ func TestVerifyKitFetchesL0AndConfirmsAnchor(t *testing.T) {
 	}
 }
 
-func TestVerifyKitClassifiesL4G2HighAssurance(t *testing.T) {
+// TestVerifyKitWithholdsG2FromSelfAssertedCredential proves the "no node
+// trust" property (DX P0-5b): an anchored bundle whose only credential
+// evidence is the self-asserted ExternalProofRef.Verified flag is classified
+// at G1, NOT G2 — even when the anchor is independently confirmed (L4).
+// Crediting G2 here would trust a flag the producing node wrote into the
+// bundle. Independent credential verification (credverify, DX P1-4) is
+// required before G2 / high_assurance can be credited.
+func TestVerifyKitWithholdsG2FromSelfAssertedCredential(t *testing.T) {
 	pkg := buildPortable(t, true)
 	r := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer()})
 
@@ -195,39 +202,43 @@ func TestVerifyKitClassifiesL4G2HighAssurance(t *testing.T) {
 		t.Fatalf("should verify: %+v", r.Checks)
 	}
 	if r.ProofLevel != "L4" {
-		t.Errorf("proofLevel = %q, want L4", r.ProofLevel)
+		t.Errorf("proofLevel = %q, want L4 (L0-confirmed anchor)", r.ProofLevel)
 	}
-	if r.GovernanceLevel != "G2" {
-		t.Errorf("governanceLevel = %q, want G2 (policy + approval + verified credential proof + anchored)", r.GovernanceLevel)
+	if r.GovernanceLevel != "G1" {
+		t.Errorf("governanceLevel = %q, want G1 (credential proof is self-asserted, not independently verified)", r.GovernanceLevel)
 	}
-	if r.AssuranceClass != "high_assurance" {
-		t.Errorf("assuranceClass = %q, want high_assurance", r.AssuranceClass)
+	if r.Tier != "L4/G1" {
+		t.Errorf("tier = %q, want L4/G1", r.Tier)
 	}
-	if r.Tier != "L4/G2" {
-		t.Errorf("tier = %q, want L4/G2", r.Tier)
+	if r.AssuranceClass == "high_assurance" {
+		t.Errorf("assuranceClass = %q; a self-asserted credential must not reach high_assurance (DX P0-5b)", r.AssuranceClass)
 	}
 }
 
 func TestVerifyKitRequireLevelFailsClosed(t *testing.T) {
 	pkg := buildPortable(t, true)
-	req, err := ParseRequiredLevel("L4/G2")
+	// L4/G1 is the honest achievable tier for this bundle: the anchor is
+	// independently confirmable (L4), but the credential proof is self-asserted
+	// so governance caps at G1 until independent credential verification lands
+	// (credverify, DX P1-4 / see P0-5b).
+	req, err := ParseRequiredLevel("L4/G1")
 	if err != nil {
 		t.Fatalf("ParseRequiredLevel: %v", err)
 	}
 
-	// No L0 confirmer → proof caps at L3 → require L4/G2 not met → fail closed.
+	// No L0 confirmer → proof caps at L3 → require L4/G1 not met → fail closed.
 	r := Verify(context.Background(), pkg, Options{Require: req})
 	if r.Verified {
-		t.Fatal("require L4/G2 must fail closed when L0 is not confirmed (proof caps at L3)")
+		t.Fatal("require L4/G1 must fail closed when L0 is not confirmed (proof caps at L3)")
 	}
 	if r.RequireMet == nil || *r.RequireMet {
 		t.Errorf("RequireMet should be false, got %v", r.RequireMet)
 	}
 
-	// With L0 confirmation the same bundle reaches L4/G2 and meets it.
+	// With L0 confirmation the same bundle reaches L4/G1 and meets it.
 	r2 := Verify(context.Background(), pkg, Options{Require: req, L0Confirmer: okConfirmer()})
 	if !r2.Verified || r2.RequireMet == nil || !*r2.RequireMet {
-		t.Fatalf("require L4/G2 should be met with L0 confirmation: verified=%v requireMet=%v", r2.Verified, r2.RequireMet)
+		t.Fatalf("require L4/G1 should be met with L0 confirmation: verified=%v requireMet=%v", r2.Verified, r2.RequireMet)
 	}
 }
 

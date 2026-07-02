@@ -43,13 +43,13 @@ func computeProofLevel(anchored, l0Confirmed bool) assurance.ProofLevel {
 //     and none of them denied.
 //   - G1 (threshold approved): G0 plus signed approval evidence bound to
 //     the plan hash.
-//   - G2 (credentialed + anchored): G1 plus an INDEPENDENTLY verified
-//     credential proof and an anchored bundle. This offline kit cannot yet
-//     verify a credential independently (issuer-signature / status checking
-//     lands with the credverify leaf, DX P1-4), so it does NOT credit G2 from
-//     the self-asserted ExternalProofRef.Verified flag — see below.
+//   - G2 (credentialed + anchored): G1 plus an INDEPENDENTLY confirmed
+//     external/credential proof and an anchored bundle. G2 is credited only when
+//     `externalProofConfirmed` is true — i.e. an injected ExternalProofConfirmer
+//     re-read the proof from its source (DX P1-4). It is NEVER credited from the
+//     self-asserted evidence.ExternalProofRef.Verified flag (DX P0-5b).
 //   - ungoverned: anything less.
-func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool) assurance.GovernanceLevel {
+func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool, externalProofConfirmed bool) assurance.GovernanceLevel {
 	if !parsed {
 		return assurance.GovernanceLevelUngoverned
 	}
@@ -78,16 +78,18 @@ func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool) assura
 		return assurance.GovernanceLevelPolicyPassed
 	}
 
-	// G2 (credentialed + anchored) requires an INDEPENDENTLY verified
-	// credential proof. ExternalProofRef.Verified is a flag the producing node
-	// wrote into the bundle; crediting G2 from it would trust the node — the
-	// exact property this "no node trust" kit exists to refute (DX P0-5b).
-	// This kit does not yet perform independent credential verification
-	// (issuer-signature / status checking arrives with the credverify leaf,
-	// DX P1-4), so the strongest governance level it can honestly substantiate
-	// is G1. The anchor half of G2 IS independently confirmable
-	// (see computeProofLevel / L0Confirmer), but the credential half is not,
-	// so the combined G2 classification is withheld until P1-4.
+	// G2 (credentialed + anchored) requires an INDEPENDENTLY confirmed external/
+	// credential proof AND an anchored bundle. `externalProofConfirmed` is set by
+	// the caller only when an injected ExternalProofConfirmer re-read the proof
+	// from its source chain (checkExternalProof) — never from the self-asserted
+	// evidence.ExternalProofRef.Verified flag, which would trust the producing
+	// node (the exact property this "no node trust" kit refutes, DX P0-5b/P1-4).
+	// With no confirmer, externalProofConfirmed is false and governance caps at
+	// G1 — the honest default.
+	anchored := bundle.Anchor == evidence.AnchorStatusAnchored || bundle.Anchor == evidence.AnchorStatusVerified
+	if externalProofConfirmed && anchored {
+		return assurance.GovernanceLevelCredentialedAnchored
+	}
 	return assurance.GovernanceLevelThresholdApproved
 }
 

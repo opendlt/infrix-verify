@@ -215,6 +215,42 @@ func TestVerifyKitWithholdsG2FromSelfAssertedCredential(t *testing.T) {
 	}
 }
 
+// okExternalProofConfirmer independently "confirms" any external proof — a test
+// stand-in for the injected adapter that re-reads the proof from its source.
+type okExternalProofConfirmer struct{}
+
+func (okExternalProofConfirmer) ConfirmExternalProof(_ context.Context, _, _, _ string, _ [32]byte, _ uint64) (*ExternalProofConfirmation, error) {
+	return &ExternalProofConfirmation{Confirmed: true, Detail: "test-confirmed"}, nil
+}
+
+// TestVerifyKitCreditsG2WhenExternalProofIndependentlyConfirmed proves the honest
+// re-crediting (DX P1-4): the same anchored bundle whose credential proof is only
+// self-asserted reaches L4/G2 ONLY when an ExternalProofConfirmer independently
+// confirms it — and stays below G2 without one.
+func TestVerifyKitCreditsG2WhenExternalProofIndependentlyConfirmed(t *testing.T) {
+	pkg := buildPortable(t, true) // anchored + carries a (self-asserted) external proof
+
+	withConf := Verify(context.Background(), pkg, Options{
+		L0Confirmer:            okConfirmer(),
+		ExternalProofConfirmer: okExternalProofConfirmer{},
+	})
+	if !withConf.Verified {
+		t.Fatalf("should verify: %+v", withConf.Checks)
+	}
+	if withConf.GovernanceLevel != "G2" {
+		t.Errorf("governanceLevel = %q, want G2 (external proof independently confirmed + anchored)", withConf.GovernanceLevel)
+	}
+	if withConf.Tier != "L4/G2" {
+		t.Errorf("tier = %q, want L4/G2", withConf.Tier)
+	}
+
+	// Without the confirmer, the self-asserted flag must NOT reach G2.
+	withoutConf := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer()})
+	if withoutConf.GovernanceLevel == "G2" {
+		t.Error("without an external-proof confirmer, a self-asserted credential must not reach G2")
+	}
+}
+
 func TestVerifyKitRequireLevelFailsClosed(t *testing.T) {
 	pkg := buildPortable(t, true)
 	// L4/G1 is the honest achievable tier for this bundle: the anchor is

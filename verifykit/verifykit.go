@@ -170,6 +170,14 @@ type Options struct {
 	// (batch inclusion) for anchored bundles.
 	L0Confirmer L0AnchorConfirmer
 
+	// ExternalProofConfirmer, when non-nil, independently re-reads a bundle's
+	// external/credential proof reference from its source chain. Governance level
+	// G2 (credentialed + anchored) is credited ONLY when this confirms — never
+	// from the self-asserted ExternalProofRef.Verified flag (DX P0-5b/P1-4). Nil
+	// means external proofs are not independently confirmed and governance caps
+	// at G1.
+	ExternalProofConfirmer ExternalProofConfirmer
+
 	// Require, when non-nil, gates Verified on the achieved levels.
 	Require *RequiredLevel
 
@@ -269,6 +277,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 
 	// 9-11. Live L0 confirmation — fetch the anchor tx directly from L0.
 	l0Confirmed := report.checkL0Anchor(ctx, &bundle, anchored, opts.L0Confirmer)
+	externalProofConfirmed := report.checkExternalProof(ctx, &bundle, opts.ExternalProofConfirmer)
 
 	// crypto verdict = every check so far passed (these are all the
 	// offline cryptographic + structural bindings; L0 is separate).
@@ -295,7 +304,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
 	proof := computeProofLevel(anchored, l0Confirmed)
-	gov := computeGovernanceLevel(&bundle, bundleParsed)
+	gov := computeGovernanceLevel(&bundle, bundleParsed, externalProofConfirmed)
 	report.finalizeLevels(proof, gov, opts.Require)
 
 	// Derived layered-verification flags (mirror the Nexus inspector).
@@ -503,6 +512,39 @@ func (r *Report) checkL0Anchor(ctx context.Context, bundle *evidence.EvidenceBun
 	}
 	r.add("l0_anchor", CheckPass, detail)
 	return true
+}
+
+// checkExternalProof independently confirms the bundle's external/credential
+// proof reference against its source chain and returns whether at least one was
+// confirmed. This is the honest basis for governance level G2 — never the
+// self-asserted evidence.ExternalProofRef.Verified flag (DX P0-5b/P1-4).
+func (r *Report) checkExternalProof(ctx context.Context, bundle *evidence.EvidenceBundle, confirmer ExternalProofConfirmer) bool {
+	if len(bundle.ExternalProofs) == 0 {
+		r.add("external_proof", CheckSkip, "bundle references no external proof")
+		return false
+	}
+	if confirmer == nil {
+		r.add("external_proof", CheckSkip, "no external-proof confirmer supplied — external proof not independently confirmed (governance caps at G1)")
+		return false
+	}
+	for i := range bundle.ExternalProofs {
+		ep := bundle.ExternalProofs[i]
+		conf, err := confirmer.ConfirmExternalProof(ctx, ep.SourceChain, ep.ProofType, ep.TxHash, ep.ProofHash, ep.BlockHeight)
+		if err != nil {
+			r.add("external_proof", CheckFail, "external proof confirmation error: "+err.Error())
+			return false
+		}
+		if conf != nil && conf.Confirmed {
+			detail := "external proof independently confirmed"
+			if conf.Detail != "" {
+				detail += " (" + conf.Detail + ")"
+			}
+			r.add("external_proof", CheckPass, detail)
+			return true
+		}
+	}
+	r.add("external_proof", CheckFail, "no referenced external proof could be independently confirmed")
+	return false
 }
 
 // finalizeLevels sets the level fields + the overall Verified flag.

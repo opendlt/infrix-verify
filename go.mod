@@ -9,11 +9,4 @@ module github.com/opendlt/infrix-verify
 
 go 1.25.7
 
-require github.com/opendlt/infrix-schema v0.1.0
-
-// DX P1-4: credverify consumes the new infrix-schema/credential package, which
-// is not yet in a published infrix-schema release. Until infrix-schema publishes
-// it (v0.2.x) and this module bumps the require above, resolve infrix-schema from
-// the sibling checkout. Remove this replace once the credential package ships in
-// a tagged infrix-schema release.
-replace github.com/opendlt/infrix-schema => ../infrix-schema
+require github.com/opendlt/infrix-schema v0.3.0

@@ -1,2 +1,4 @@
 github.com/opendlt/infrix-schema v0.3.0 h1:SHtJ7wER5fb8M3RTP7jW6Ty3LWnZTqLBQP4JJFJmDxU=
 github.com/opendlt/infrix-schema v0.3.0/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=
+github.com/opendlt/infrix-schema v0.4.0 h1:HZjIfi71oR/0l0cWUAELEpmxuNZaaKRVsdCrQAVy6so=
+github.com/opendlt/infrix-schema v0.4.0/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=

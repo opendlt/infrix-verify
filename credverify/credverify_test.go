@@ -8,7 +8,6 @@ package credverify
 
 import (
 	"crypto/ed25519"
-	"encoding/hex"
 	"testing"
 	"time"
 
@@ -31,7 +30,11 @@ func signVC(t *testing.T, vc *credential.VerifiableCredential, priv ed25519.Priv
 	vc.Proof = &credential.Proof{
 		Type:               "Ed25519Signature2020",
 		VerificationMethod: vm,
-		ProofValue:         hex.EncodeToString(ed25519.Sign(priv, content)),
+		// Canonical multibase base58btc. These tests used to feed this
+		// package hex — an encoding no Infrix producer has ever emitted —
+		// so the verifier round-tripped against its own tests while being
+		// unable to read a single real credential.
+		ProofValue: encodeProofValue(ed25519.Sign(priv, content)),
 	}
 }
 
@@ -153,7 +156,7 @@ func TestVerifyPresentation_RoundTrip(t *testing.T) {
 		Type:               "Ed25519Signature2020",
 		VerificationMethod: holderVM,
 		Challenge:          challenge,
-		ProofValue:         hex.EncodeToString(ed25519.Sign(holdPriv, content)),
+		ProofValue:         encodeProofValue(ed25519.Sign(holdPriv, content)),
 	}
 
 	issuerOpts := Options{ResolveIssuerKey: resolverFor(issPub)}

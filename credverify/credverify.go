@@ -20,7 +20,6 @@ package credverify
 
 import (
 	"crypto/ed25519"
-	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -118,7 +117,7 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 		} else {
 			pub, err := opts.ResolveIssuerKey(vc.Issuer, vc.Proof.VerificationMethod)
 			content, cerr := vc.SigningContent()
-			sig, serr := hex.DecodeString(vc.Proof.ProofValue)
+			sig, serr := decodeProofValue(vc.Proof.ProofValue)
 			switch {
 			case err != nil:
 				c.add("issuer_signature", false, "resolve issuer key: "+err.Error())
@@ -180,7 +179,7 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 	default:
 		pub, err := resolveHolderKey(vp.Holder, vp.Proof.VerificationMethod)
 		content, cerr := vp.SigningContent(challenge)
-		sig, serr := hex.DecodeString(vp.Proof.ProofValue)
+		sig, serr := decodeProofValue(vp.Proof.ProofValue)
 		switch {
 		case err != nil:
 			c.add("holder_signature", false, "resolve holder key: "+err.Error())

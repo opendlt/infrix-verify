@@ -1,0 +1,209 @@
+{
+  "spec": "did-infrix-v1",
+  "networkId": "g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81",
+  "parse": [
+    {
+      "name": "acc plain account",
+      "input": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme",
+      "valid": true,
+      "canonical": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme",
+      "canonicalBytesHex": "6469643a696e667269783a76313a6163633a67312d653366333131393231336131656164343436343736353964363765343766343236396132616666623133663135306161383762323062616163663933636638313a616c6963652e61636d65",
+      "profile": "acc",
+      "owner": "infrix"
+    },
+    {
+      "name": "acc sub-account path",
+      "input": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme:book:1",
+      "valid": true,
+      "canonical": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme:book:1",
+      "canonicalBytesHex": "6469643a696e667269783a76313a6163633a67312d653366333131393231336131656164343436343736353964363765343766343236396132616666623133663135306161383762323062616163663933636638313a616c6963652e61636d653a626f6f6b3a31",
+      "profile": "acc",
+      "owner": "infrix"
+    },
+    {
+      "name": "acc unicode segment",
+      "input": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme:%D0%BA%D0%BB%D1%8E%D1%87",
+      "valid": true,
+      "canonical": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme:%D0%BA%D0%BB%D1%8E%D1%87",
+      "canonicalBytesHex": "6469643a696e667269783a76313a6163633a67312d653366333131393231336131656164343436343736353964363765343766343236396132616666623133663135306161383762323062616163663933636638313a616c6963652e61636d653a254430254241254430254242254431253845254431253837",
+      "profile": "acc",
+      "owner": "infrix"
+    },
+    {
+      "name": "anon subject",
+      "input": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "valid": true,
+      "canonical": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "canonicalBytesHex": "6469643a696e667269783a76313a616e6f6e3a67312d653366333131393231336131656164343436343736353964363765343766343236396132616666623133663135306161383762323062616163663933636638313a30313233343536373839616263646566303132333435363738396162636465663031323334353637383961626364656630313233343536373839616263646566",
+      "profile": "anon",
+      "owner": "infrix"
+    },
+    {
+      "name": "chain eip155 account",
+      "input": "did:infrix:v1:chain:eip155:1:0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+      "valid": true,
+      "canonical": "did:infrix:v1:chain:eip155:1:0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+      "canonicalBytesHex": "6469643a696e667269783a76313a636861696e3a6569703135353a313a307835616165623630353366336539346339623961303966333336363934333565376566316265616564",
+      "profile": "chain",
+      "owner": "infrix"
+    },
+    {
+      "name": "foreign did:key",
+      "input": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+      "valid": true,
+      "canonical": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+      "owner": "foreign"
+    },
+    {
+      "name": "foreign did:web",
+      "input": "did:web:example.com",
+      "valid": true,
+      "canonical": "did:web:example.com",
+      "owner": "foreign"
+    },
+    {
+      "name": "foreign did:web path",
+      "input": "did:web:example.com:users:alice",
+      "valid": true,
+      "canonical": "did:web:example.com:users:alice",
+      "owner": "foreign"
+    },
+    {
+      "name": "foreign did:pkh",
+      "input": "did:pkh:eip155:1:0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+      "valid": true,
+      "canonical": "did:pkh:eip155:1:0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+      "owner": "foreign"
+    },
+    {
+      "name": "legacy acc spelling",
+      "input": "did:infrix:acc://alice.acme",
+      "valid": false,
+      "refusal": "legacy-input"
+    },
+    {
+      "name": "unsupported grammar version",
+      "input": "did:infrix:v2:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme",
+      "valid": false,
+      "refusal": "unsupported-version"
+    },
+    {
+      "name": "unversioned grammar",
+      "input": "did:infrix:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme",
+      "valid": false,
+      "refusal": "unsupported-version"
+    },
+    {
+      "name": "unknown profile",
+      "input": "did:infrix:v1:future:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:x",
+      "valid": false,
+      "refusal": "unsupported-profile"
+    },
+    {
+      "name": "mutable network label",
+      "input": "did:infrix:v1:acc:kermit:alice.acme",
+      "valid": false,
+      "refusal": "network"
+    },
+    {
+      "name": "anon network label",
+      "input": "did:infrix:v1:anon:kermit:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "valid": false,
+      "refusal": "network"
+    },
+    {
+      "name": "lower-case percent escape",
+      "input": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme:%d0%ba%d0%bb%d1%8e%d1%87",
+      "valid": false,
+      "refusal": "non-canonical"
+    },
+    {
+      "name": "upper-case anon subject",
+      "input": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+      "valid": false,
+      "refusal": "profile-semantics"
+    },
+    {
+      "name": "short anon subject",
+      "input": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:subject",
+      "valid": false,
+      "refusal": "profile-semantics"
+    },
+    {
+      "name": "chain upper-case account",
+      "input": "did:infrix:v1:chain:eip155:1:0x5AAEB6053F3E94C9B9A09F33669435E7EF1BEAED",
+      "valid": false,
+      "refusal": "non-canonical"
+    },
+    {
+      "name": "chain unknown namespace",
+      "input": "did:infrix:v1:chain:tezos:1:0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+      "valid": false,
+      "refusal": "profile-semantics"
+    },
+    {
+      "name": "chain missing account",
+      "input": "did:infrix:v1:chain:eip155:1",
+      "valid": false,
+      "refusal": "malformed"
+    },
+    {
+      "name": "canonical id with a path",
+      "input": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme/book",
+      "valid": false,
+      "refusal": "malformed"
+    },
+    {
+      "name": "unknown foreign method",
+      "input": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+      "valid": false,
+      "refusal": "unsupported-method"
+    },
+    {
+      "name": "foreign DID wrapped in Infrix",
+      "input": "did:infrix:did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+      "valid": false,
+      "refusal": "rewrap"
+    },
+    {
+      "name": "foreign web host upper-case",
+      "input": "did:web:EXAMPLE.com",
+      "valid": false,
+      "refusal": "foreign-identifier"
+    },
+    {
+      "name": "not a DID",
+      "input": "alice.acme",
+      "valid": false,
+      "refusal": "malformed"
+    }
+  ],
+  "construct": [
+    {
+      "name": "acc authority is case-insensitive",
+      "profile": "acc",
+      "args": [
+        "acc://Alice.ACME/Book"
+      ],
+      "canonical": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme:book"
+    },
+    {
+      "name": "chain account case is normalized",
+      "profile": "chain",
+      "args": [
+        "eip155",
+        "1",
+        "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
+      ],
+      "canonical": "did:infrix:v1:chain:eip155:1:0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+    },
+    {
+      "name": "acc unicode segment is NFC",
+      "profile": "acc",
+      "args": [
+        "acc://alice.acme/ключ"
+      ],
+      "canonical": "did:infrix:v1:acc:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:alice.acme:%D0%BA%D0%BB%D1%8E%D1%87"
+    }
+  ]
+}

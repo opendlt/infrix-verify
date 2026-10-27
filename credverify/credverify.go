@@ -158,8 +158,9 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 	}
 }
 
-// VerifyPresentation verifies a VP: the holder's signature over the challenge,
-// and every embedded credential. It fails closed on a missing/mismatched
+// VerifyPresentation verifies a VP: the holder's signature over the proof-configuration
+// digest (type, created, verificationMethod, proofPurpose, challenge, domain and nonce are all
+// inside it; a presentation bound by concatenation is refused), and every embedded credential. It fails closed on a missing/mismatched
 // challenge or an unresolved holder key.
 func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string, opts Options, resolveHolderKey KeyResolver) Report {
 	c := newChecker()

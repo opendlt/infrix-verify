@@ -9,4 +9,4 @@ module github.com/opendlt/infrix-verify
 
 go 1.25.7
 
-require github.com/opendlt/infrix-schema v0.6.0
+require github.com/opendlt/infrix-schema v0.7.2-0.20261027220947-dd430ec1a11d

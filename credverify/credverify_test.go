@@ -148,16 +148,18 @@ func TestVerifyPresentation_RoundTrip(t *testing.T) {
 		Holder:               holderDID,
 		VerifiableCredential: []credential.VerifiableCredential{*vc},
 	}
-	content, err := vp.SigningContent(challenge)
-	if err != nil {
-		t.Fatalf("vp signing content: %v", err)
-	}
+	// The holder signs through the proof configuration, so the configuration is set first and the
+	// proofValue is added after the signing content is computed.
 	vp.Proof = &credential.Proof{
 		Type:               "Ed25519Signature2020",
 		VerificationMethod: holderVM,
 		Challenge:          challenge,
-		ProofValue:         encodeProofValue(ed25519.Sign(holdPriv, content)),
 	}
+	content, err := vp.SigningContent(challenge)
+	if err != nil {
+		t.Fatalf("vp signing content: %v", err)
+	}
+	vp.Proof.ProofValue = encodeProofValue(ed25519.Sign(holdPriv, content))
 
 	issuerOpts := Options{ResolveIssuerKey: resolverFor(issPub)}
 	rep := VerifyPresentation(vp, challenge, issuerOpts, resolverFor(holdPub))

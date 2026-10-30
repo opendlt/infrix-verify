@@ -229,6 +229,16 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 		c.add("holder_signature", false, "no holder key resolver supplied (fail closed)")
 	default:
 		pub, err := resolveHolderKey(vp.Holder, vp.Proof.VerificationMethod)
+		if err == nil && len(pub) == ed25519.PublicKeySize && isConformingPresentation(vp) {
+			// Conforming suite: chosen by the document (it names the suite context), never by trying both.
+			c.rep.Construction = "Ed25519Signature2020"
+			if lerr := verifyPresentationSignature2020(vp, pub, opts.PinnedContexts); lerr != nil {
+				c.add("holder_signature", false, lerr.Error())
+			} else {
+				c.add("holder_signature", true, "conforming Ed25519Signature2020")
+			}
+			goto afterHolder
+		}
 		content, cerr := vp.SigningContent(challenge)
 		sig, serr := decodeProofValue(vp.Proof.ProofValue)
 		switch {
@@ -243,9 +253,13 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 		case !ed25519.Verify(pub, content, sig):
 			c.add("holder_signature", false, "holder signature does not verify")
 		default:
-			c.add("holder_signature", true, "")
+			// The legacy holder construction: stated in the verdict, never taken for the suite its proof type names.
+			c.rep.Construction = LegacyHolderConstruction
+			c.addLegacy(LegacyHolderConstruction)
+			c.add("holder_signature", true, "read under the legacy label "+LegacyHolderConstruction+": Ed25519 over SHA-256(proof configuration) || SHA-256(presentation JSON), not a conforming "+vp.Proof.Type)
 		}
 	}
+afterHolder:
 
 	// every embedded credential must independently verify.
 	for i := range vp.VerifiableCredential {

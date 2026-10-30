@@ -148,3 +148,84 @@ func TestLegacyConstructionVerifiesOnlyUnderItsLabel(t *testing.T) {
 		t.Fatalf("the verdict does not state %s: %v", LegacyConstruction, rep.Legacy)
 	}
 }
+
+// The W3C CCG presentation vector vp_0 (challenge 123, proofPurpose authentication, an embedded credential): the holder proof
+// and the embedded credential verify through this module's own canonicalizer, with the conforming label and no legacy label.
+func vectorPresentation(t *testing.T, mutate func(vp *credential.VerifiablePresentation)) *credential.VerifiablePresentation {
+	t.Helper()
+	raw, err := os.ReadFile(vectorDir + "vp_0.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vp credential.VerifiablePresentation
+	if err := json.Unmarshal(raw, &vp); err != nil {
+		t.Fatal(err)
+	}
+	if mutate != nil {
+		mutate(&vp)
+	}
+	return &vp
+}
+
+func TestW3CEd25519Signature2020PresentationVerifiesWithTheConformingLabel(t *testing.T) {
+	opts := vectorOptions(t)
+	rep := VerifyPresentation(vectorPresentation(t, nil), "123", opts, opts.ResolveIssuerKey)
+	if !rep.Verified {
+		t.Fatalf("the W3C presentation vector did not verify: %+v", rep)
+	}
+	if rep.Construction != "Ed25519Signature2020" || len(rep.Legacy) != 0 {
+		t.Fatalf("a conforming holder proof must report the suite and no legacy label: %q %v", rep.Construction, rep.Legacy)
+	}
+}
+
+func TestConformingHolderProofPlantedDefectsAreRefused(t *testing.T) {
+	opts := vectorOptions(t)
+	cases := map[string]func(vp *credential.VerifiablePresentation){
+		"another challenge":  func(vp *credential.VerifiablePresentation) { vp.Proof.Challenge = "124" },
+		"added domain":       func(vp *credential.VerifiablePresentation) { vp.Proof.Domain = "evil.example" },
+		"added nonce":        func(vp *credential.VerifiablePresentation) { vp.Proof.Nonce = "n" },
+		"changed created":    func(vp *credential.VerifiablePresentation) { vp.Proof.Created = "2021-06-04T20:50:10Z" },
+		"credential purpose": func(vp *credential.VerifiablePresentation) { vp.Proof.ProofPurpose = "assertionMethod" },
+		"changed holder":     func(vp *credential.VerifiablePresentation) { vp.Holder = "did:ex:other" },
+		"embedded claim": func(vp *credential.VerifiablePresentation) {
+			vp.VerifiableCredential[0].CredentialSubject["degree"].(map[string]any)["name"] = "Doctor"
+		},
+		"suite context out": func(vp *credential.VerifiablePresentation) {
+			var keep []string
+			for _, c := range vp.Context {
+				if c != suiteContext {
+					keep = append(keep, c)
+				}
+			}
+			vp.Context = keep
+		},
+	}
+	for name, mutate := range cases {
+		if rep := VerifyPresentation(vectorPresentation(t, mutate), "", opts, opts.ResolveIssuerKey); rep.Verified {
+			t.Errorf("PLANTED DEFECT NOT REFUSED (%s): %+v", name, rep)
+		}
+	}
+	if rep := VerifyPresentation(vectorPresentation(t, nil), "other-challenge", opts, opts.ResolveIssuerKey); rep.Verified {
+		t.Error("PLANTED DEFECT NOT REFUSED: a presentation replayed under another challenge verified")
+	}
+}
+
+// The shared holder vector (the proof-configuration digest construction issued before presentations were signed through the
+// suite) still verifies, and the verdict states the legacy holder label instead of presenting it as the suite its type names.
+func TestLegacyHolderConstructionVerifiesOnlyUnderItsLabel(t *testing.T) {
+	vp, pub, sig := holderVector(t)
+	vp.Proof.ProofValue = encodeProofValue(sig)
+	rep := VerifyPresentation(vp, "challenge-123", Options{}, holderResolver(pub))
+	if !rep.Verified || rep.Construction != LegacyHolderConstruction {
+		t.Fatalf("the legacy holder vector: %+v", rep)
+	}
+	found := false
+	for _, l := range rep.Legacy {
+		if l == LegacyHolderConstruction {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the verdict does not state %s: %v", LegacyHolderConstruction, rep.Legacy)
+	}
+}

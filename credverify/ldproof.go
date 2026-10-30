@@ -34,6 +34,11 @@ import (
 // the legacy construction (Ed25519 over sha256 of the JSON), which is verified under the typed label
 // LegacyConstruction and reported in Report.Legacy.
 
+// LegacyHolderConstruction is the label of the holder-proof construction issued under the Ed25519Signature2020 name before
+// presentations were signed through the suite: Ed25519 over SHA-256(canonical proof configuration) || SHA-256(presentation
+// JSON without proof), the one infrix-schema's VerifiablePresentation.SigningContent computes.
+const LegacyHolderConstruction = "legacy:holder-proof-configuration-digest"
+
 // LegacyConstruction is the label of the signature construction issued under the Ed25519Signature2020 name
 // before the suite was implemented: Ed25519 over sha256(json.Marshal(credential without proof)).
 const LegacyConstruction = "legacy:sha256-json-ed25519"
@@ -277,17 +282,54 @@ func isConformingEd25519Signature2020(vc *credential.VerifiableCredential) bool 
 	return vc.Proof != nil && vc.Proof.Type == "Ed25519Signature2020" && hasContext(vc.Context, Ed25519Suite2020Context)
 }
 
-// verifyEd25519Signature2020 checks the conforming proof against the issuer key the caller resolved.
+// verifyEd25519Signature2020 checks the conforming proof of a credential against the issuer key the caller resolved.
 func verifyEd25519Signature2020(vc *credential.VerifiableCredential, pub ed25519.PublicKey, extra []PinnedContext) error {
 	p := vc.Proof
-	if p.ProofPurpose != "assertionMethod" {
-		return fmt.Errorf("%w: proofPurpose is %q, a credential proof needs assertionMethod", ErrLinkedData, p.ProofPurpose)
+	if p.Challenge != "" || p.Domain != "" || p.Nonce != "" {
+		return fmt.Errorf("%w: a credential proof carries no challenge, domain or nonce", ErrLinkedData)
+	}
+	unsigned := *vc
+	unsigned.Proof = nil
+	raw, err := json.Marshal(unsigned)
+	if err != nil {
+		return err
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return err
+	}
+	return verifyLinkedDataProof(doc, vc.Context, p, pub, extra, "assertionMethod")
+}
+
+// isConformingPresentation reports whether the holder proof is read as the conforming suite: the type is
+// Ed25519Signature2020 and the presentation names the context that defines it.
+func isConformingPresentation(vp *credential.VerifiablePresentation) bool {
+	return vp.Proof != nil && vp.Proof.Type == "Ed25519Signature2020" && hasContext(vp.Context, Ed25519Suite2020Context)
+}
+
+// verifyPresentationSignature2020 checks the conforming holder proof (proofPurpose authentication, challenge, domain and
+// nonce inside the signed configuration) against the holder key the caller resolved.
+func verifyPresentationSignature2020(vp *credential.VerifiablePresentation, pub ed25519.PublicKey, extra []PinnedContext) error {
+	unsigned := *vp
+	unsigned.Proof = nil
+	raw, err := json.Marshal(unsigned)
+	if err != nil {
+		return err
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return err
+	}
+	return verifyLinkedDataProof(doc, vp.Context, vp.Proof, pub, extra, "authentication")
+}
+
+// verifyLinkedDataProof is the shared Ed25519Signature2020 check over a document without its proof.
+func verifyLinkedDataProof(doc map[string]interface{}, contexts []string, p *credential.Proof, pub ed25519.PublicKey, extra []PinnedContext, purpose string) error {
+	if p.ProofPurpose != purpose {
+		return fmt.Errorf("%w: proofPurpose is %q, this proof needs %s", ErrLinkedData, p.ProofPurpose, purpose)
 	}
 	if _, err := time.Parse(time.RFC3339, p.Created); err != nil {
 		return fmt.Errorf("%w: created %q is not an xsd:dateTime", ErrLinkedData, p.Created)
-	}
-	if p.Challenge != "" || p.Domain != "" || p.Nonce != "" {
-		return fmt.Errorf("%w: a credential proof carries no challenge, domain or nonce", ErrLinkedData)
 	}
 	sig, err := decodeProofValue(p.ProofValue)
 	if err != nil {
@@ -300,23 +342,18 @@ func verifyEd25519Signature2020(vc *credential.VerifiableCredential, pub ed25519
 	if err != nil {
 		return err
 	}
-	unsigned := *vc
-	unsigned.Proof = nil
-	raw, err := json.Marshal(unsigned)
-	if err != nil {
-		return err
-	}
-	var doc map[string]interface{}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return err
-	}
-	ctx := make([]interface{}, len(vc.Context))
-	for i, c := range vc.Context {
+	ctx := make([]interface{}, len(contexts))
+	for i, c := range contexts {
 		ctx[i] = c
 	}
 	cfg := map[string]interface{}{
 		"@context": ctx, "type": "Ed25519Signature2020", "created": p.Created,
 		"verificationMethod": p.VerificationMethod, "proofPurpose": p.ProofPurpose,
+	}
+	for k, v := range map[string]string{"challenge": p.Challenge, "domain": p.Domain, "nonce": p.Nonce} {
+		if v != "" {
+			cfg[k] = v
+		}
 	}
 	canonDoc, err := canonicalize(doc, loader)
 	if err != nil {

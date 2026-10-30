@@ -1,2 +1,4 @@
 # The shared did:infrix vector set is pinned by SHA-256; no platform may rewrite its bytes.
 credverify/testdata/did-vectors-v1.json -text
+credverify/contexts/** -text
+credverify/testdata/** -text

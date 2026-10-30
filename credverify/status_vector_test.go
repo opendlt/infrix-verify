@@ -46,8 +46,13 @@ func signedWithStatus(t *testing.T, entry string) (*credential.VerifiableCredent
 func TestStandardStatusEntryVerifiesWithNoLegacyLabel(t *testing.T) {
 	vc, pub := signedWithStatus(t, statusEntryVector)
 	rep := VerifyCredential(vc, Options{ResolveIssuerKey: resolverFor(pub)})
-	if !rep.Verified || len(rep.Legacy) != 0 {
-		t.Fatalf("a StatusList2021 entry must verify with no legacy label: %+v", rep)
+	if !rep.Verified {
+		t.Fatalf("a StatusList2021 entry must verify: %+v", rep)
+	}
+	for _, l := range rep.Legacy {
+		if l == string(credential.StatusFormLegacyRevocationList2020) {
+			t.Fatalf("a StatusList2021 entry was labelled legacy: %v", rep.Legacy)
+		}
 	}
 }
 
@@ -57,7 +62,13 @@ func TestLegacyStatusEntryIsReadUnderAnExplicitLabel(t *testing.T) {
 	if !rep.Verified {
 		t.Fatalf("an already issued RevocationList2020-named entry stopped verifying: %+v", rep)
 	}
-	if len(rep.Legacy) != 1 || rep.Legacy[0] != string(credential.StatusFormLegacyRevocationList2020) {
+	stated := false
+	for _, l := range rep.Legacy {
+		if l == string(credential.StatusFormLegacyRevocationList2020) {
+			stated = true
+		}
+	}
+	if !stated {
 		t.Fatalf("the verdict must state the legacy label %q, got %v", credential.StatusFormLegacyRevocationList2020, rep.Legacy)
 	}
 	var detail string

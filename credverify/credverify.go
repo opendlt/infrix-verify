@@ -40,6 +40,9 @@ type Report struct {
 	Issuer   string  `json:"issuer,omitempty"`
 	Holder   string  `json:"holder,omitempty"`
 	Checks   []Check `json:"checks"`
+	// Construction names the signature construction the issuer signature was checked as:
+	// "Ed25519Signature2020" (the conforming suite) or LegacyConstruction.
+	Construction string `json:"construction,omitempty"`
 	// Legacy lists, by typed label, every legacy construction the verdict accepted. A verdict with a
 	// non-empty Legacy is NOT a statement that the credential conforms to the current standards; it
 	// says the credential was issued under a superseded construction this verifier still reads.
@@ -60,6 +63,9 @@ type Options struct {
 	// IsRevoked reports whether a credential ID has been revoked. Optional; when
 	// nil, revocation is not checked (and does not fail).
 	IsRevoked func(credentialID string) bool
+	// PinnedContexts pins, by SHA-256, the operator contexts a conforming credential may name beside the
+	// ones this module pins (VCDM 1.1, StatusList2021, Ed25519Signature2020, the Infrix claims context).
+	PinnedContexts []PinnedContext
 }
 
 func (o Options) now() time.Time {
@@ -146,6 +152,16 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 			c.add("issuer_signature", false, "no issuer key resolver supplied (fail closed)")
 		} else {
 			pub, err := opts.ResolveIssuerKey(vc.Issuer, vc.Proof.VerificationMethod)
+			if err == nil && len(pub) == ed25519.PublicKeySize && isConformingEd25519Signature2020(vc) {
+				// Conforming suite: chosen by the document (it names the suite context), never by trying both.
+				c.rep.Construction = "Ed25519Signature2020"
+				if lerr := verifyEd25519Signature2020(vc, pub, opts.PinnedContexts); lerr != nil {
+					c.add("issuer_signature", false, lerr.Error())
+				} else {
+					c.add("issuer_signature", true, "conforming Ed25519Signature2020")
+				}
+				goto afterSignature
+			}
 			content, cerr := vc.SigningContent()
 			sig, serr := decodeProofValue(vc.Proof.ProofValue)
 			switch {
@@ -160,10 +176,14 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 			case !ed25519.Verify(pub, content, sig):
 				c.add("issuer_signature", false, "signature does not verify against the issuer key")
 			default:
-				c.add("issuer_signature", true, "")
+				// The legacy construction: stated in the verdict, never taken for the suite it is named after.
+				c.rep.Construction = LegacyConstruction
+				c.addLegacy(LegacyConstruction)
+				c.add("issuer_signature", true, "read under the legacy label "+LegacyConstruction+": Ed25519 over sha256 of the JSON, not a conforming "+vc.Proof.Type)
 			}
 		}
 	}
+afterSignature:
 
 	// expiry
 	if vc.ExpirationDate != "" {

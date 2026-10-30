@@ -40,6 +40,13 @@ type Report struct {
 	Issuer   string  `json:"issuer,omitempty"`
 	Holder   string  `json:"holder,omitempty"`
 	Checks   []Check `json:"checks"`
+	// Construction names the signature construction the issuer signature was checked as:
+	// "Ed25519Signature2020" (the conforming suite) or LegacyConstruction.
+	Construction string `json:"construction,omitempty"`
+	// Legacy lists, by typed label, every legacy construction the verdict accepted. A verdict with a
+	// non-empty Legacy is NOT a statement that the credential conforms to the current standards; it
+	// says the credential was issued under a superseded construction this verifier still reads.
+	Legacy []string `json:"legacy,omitempty"`
 }
 
 // KeyResolver maps a DID + verificationMethod to its Ed25519 public key. Injected
@@ -56,6 +63,9 @@ type Options struct {
 	// IsRevoked reports whether a credential ID has been revoked. Optional; when
 	// nil, revocation is not checked (and does not fail).
 	IsRevoked func(credentialID string) bool
+	// PinnedContexts pins, by SHA-256, the operator contexts a conforming credential may name beside the
+	// ones this module pins (VCDM 1.1, StatusList2021, Ed25519Signature2020, the Infrix claims context).
+	PinnedContexts []PinnedContext
 }
 
 func (o Options) now() time.Time {
@@ -66,8 +76,18 @@ func (o Options) now() time.Time {
 }
 
 type checker struct {
-	rep Report
-	ok  bool
+	rep    Report
+	ok     bool
+	legacy []string
+}
+
+func (c *checker) addLegacy(label string) {
+	for _, l := range c.legacy {
+		if l == label {
+			return
+		}
+	}
+	c.legacy = append(c.legacy, label)
 }
 
 func newChecker() *checker { return &checker{ok: true} }
@@ -94,6 +114,7 @@ func VerifyCredential(vc *credential.VerifiableCredential, opts Options) Report 
 	}
 	verifyCredentialInto(c, vc, opts)
 	c.rep.Verified = c.ok
+	c.rep.Legacy = c.legacy
 	return c.rep
 }
 
@@ -110,12 +131,37 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 		c.add("structure", true, "")
 	}
 
+	// status entry: the StatusList2021 member names are the only ones taken as current; a
+	// RevocationList2020-named entry is read under an explicit legacy label, never silently.
+	if vc.CredentialStatus != nil {
+		form, _, _, err := vc.CredentialStatus.Resolve()
+		switch {
+		case err != nil:
+			c.add("status_entry", false, err.Error())
+		case form == credential.StatusFormLegacyRevocationList2020:
+			c.addLegacy(string(form))
+			c.add("status_entry", true, "read under the legacy label "+string(form)+": the entry uses the RevocationList2020 member names, not statusPurpose/statusListIndex/statusListCredential")
+		default:
+			c.add("status_entry", true, "")
+		}
+	}
+
 	// issuer signature — the honest check that replaces a self-asserted flag.
 	if vc.Proof != nil {
 		if opts.ResolveIssuerKey == nil {
 			c.add("issuer_signature", false, "no issuer key resolver supplied (fail closed)")
 		} else {
 			pub, err := opts.ResolveIssuerKey(vc.Issuer, vc.Proof.VerificationMethod)
+			if err == nil && len(pub) == ed25519.PublicKeySize && isConformingEd25519Signature2020(vc) {
+				// Conforming suite: chosen by the document (it names the suite context), never by trying both.
+				c.rep.Construction = "Ed25519Signature2020"
+				if lerr := verifyEd25519Signature2020(vc, pub, opts.PinnedContexts); lerr != nil {
+					c.add("issuer_signature", false, lerr.Error())
+				} else {
+					c.add("issuer_signature", true, "conforming Ed25519Signature2020")
+				}
+				goto afterSignature
+			}
 			content, cerr := vc.SigningContent()
 			sig, serr := decodeProofValue(vc.Proof.ProofValue)
 			switch {
@@ -130,10 +176,14 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 			case !ed25519.Verify(pub, content, sig):
 				c.add("issuer_signature", false, "signature does not verify against the issuer key")
 			default:
-				c.add("issuer_signature", true, "")
+				// The legacy construction: stated in the verdict, never taken for the suite it is named after.
+				c.rep.Construction = LegacyConstruction
+				c.addLegacy(LegacyConstruction)
+				c.add("issuer_signature", true, "read under the legacy label "+LegacyConstruction+": Ed25519 over sha256 of the JSON, not a conforming "+vc.Proof.Type)
 			}
 		}
 	}
+afterSignature:
 
 	// expiry
 	if vc.ExpirationDate != "" {
@@ -158,8 +208,9 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 	}
 }
 
-// VerifyPresentation verifies a VP: the holder's signature over the challenge,
-// and every embedded credential. It fails closed on a missing/mismatched
+// VerifyPresentation verifies a VP: the holder's signature over the proof-configuration
+// digest (type, created, verificationMethod, proofPurpose, challenge, domain and nonce are all
+// inside it; a presentation bound by concatenation is refused), and every embedded credential. It fails closed on a missing/mismatched
 // challenge or an unresolved holder key.
 func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string, opts Options, resolveHolderKey KeyResolver) Report {
 	c := newChecker()
@@ -178,6 +229,16 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 		c.add("holder_signature", false, "no holder key resolver supplied (fail closed)")
 	default:
 		pub, err := resolveHolderKey(vp.Holder, vp.Proof.VerificationMethod)
+		if err == nil && len(pub) == ed25519.PublicKeySize && isConformingPresentation(vp) {
+			// Conforming suite: chosen by the document (it names the suite context), never by trying both.
+			c.rep.Construction = "Ed25519Signature2020"
+			if lerr := verifyPresentationSignature2020(vp, pub, opts.PinnedContexts); lerr != nil {
+				c.add("holder_signature", false, lerr.Error())
+			} else {
+				c.add("holder_signature", true, "conforming Ed25519Signature2020")
+			}
+			goto afterHolder
+		}
 		content, cerr := vp.SigningContent(challenge)
 		sig, serr := decodeProofValue(vp.Proof.ProofValue)
 		switch {
@@ -192,14 +253,21 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 		case !ed25519.Verify(pub, content, sig):
 			c.add("holder_signature", false, "holder signature does not verify")
 		default:
-			c.add("holder_signature", true, "")
+			// The legacy holder construction: stated in the verdict, never taken for the suite its proof type names.
+			c.rep.Construction = LegacyHolderConstruction
+			c.addLegacy(LegacyHolderConstruction)
+			c.add("holder_signature", true, "read under the legacy label "+LegacyHolderConstruction+": Ed25519 over SHA-256(proof configuration) || SHA-256(presentation JSON), not a conforming "+vp.Proof.Type)
 		}
 	}
+afterHolder:
 
 	// every embedded credential must independently verify.
 	for i := range vp.VerifiableCredential {
 		vc := vp.VerifiableCredential[i]
 		sub := VerifyCredential(&vc, opts)
+		for _, l := range sub.Legacy {
+			c.addLegacy(l)
+		}
 		detail := ""
 		if !sub.Verified {
 			detail = firstFailure(sub)
@@ -208,6 +276,7 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 	}
 
 	c.rep.Verified = c.ok
+	c.rep.Legacy = c.legacy
 	return c.rep
 }
 

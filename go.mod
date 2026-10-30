@@ -9,4 +9,10 @@ module github.com/opendlt/infrix-verify
 
 go 1.25.7
 
-require github.com/opendlt/infrix-schema v0.6.0
+require github.com/opendlt/infrix-schema v0.7.2-0.20261030074437-3b8028598cc4
+
+require (
+	github.com/cayleygraph/quad v1.3.0 // indirect
+	github.com/piprate/json-gold v0.9.1
+	github.com/pquerna/cachecontrol v0.2.0 // indirect
+)

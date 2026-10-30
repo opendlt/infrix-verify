@@ -40,6 +40,10 @@ type Report struct {
 	Issuer   string  `json:"issuer,omitempty"`
 	Holder   string  `json:"holder,omitempty"`
 	Checks   []Check `json:"checks"`
+	// Legacy lists, by typed label, every legacy construction the verdict accepted. A verdict with a
+	// non-empty Legacy is NOT a statement that the credential conforms to the current standards; it
+	// says the credential was issued under a superseded construction this verifier still reads.
+	Legacy []string `json:"legacy,omitempty"`
 }
 
 // KeyResolver maps a DID + verificationMethod to its Ed25519 public key. Injected
@@ -66,8 +70,18 @@ func (o Options) now() time.Time {
 }
 
 type checker struct {
-	rep Report
-	ok  bool
+	rep    Report
+	ok     bool
+	legacy []string
+}
+
+func (c *checker) addLegacy(label string) {
+	for _, l := range c.legacy {
+		if l == label {
+			return
+		}
+	}
+	c.legacy = append(c.legacy, label)
 }
 
 func newChecker() *checker { return &checker{ok: true} }
@@ -94,6 +108,7 @@ func VerifyCredential(vc *credential.VerifiableCredential, opts Options) Report 
 	}
 	verifyCredentialInto(c, vc, opts)
 	c.rep.Verified = c.ok
+	c.rep.Legacy = c.legacy
 	return c.rep
 }
 
@@ -108,6 +123,21 @@ func verifyCredentialInto(c *checker, vc *credential.VerifiableCredential, opts 
 		c.add("structure", false, "missing proof")
 	default:
 		c.add("structure", true, "")
+	}
+
+	// status entry: the StatusList2021 member names are the only ones taken as current; a
+	// RevocationList2020-named entry is read under an explicit legacy label, never silently.
+	if vc.CredentialStatus != nil {
+		form, _, _, err := vc.CredentialStatus.Resolve()
+		switch {
+		case err != nil:
+			c.add("status_entry", false, err.Error())
+		case form == credential.StatusFormLegacyRevocationList2020:
+			c.addLegacy(string(form))
+			c.add("status_entry", true, "read under the legacy label "+string(form)+": the entry uses the RevocationList2020 member names, not statusPurpose/statusListIndex/statusListCredential")
+		default:
+			c.add("status_entry", true, "")
+		}
 	}
 
 	// issuer signature — the honest check that replaces a self-asserted flag.
@@ -201,6 +231,9 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 	for i := range vp.VerifiableCredential {
 		vc := vp.VerifiableCredential[i]
 		sub := VerifyCredential(&vc, opts)
+		for _, l := range sub.Legacy {
+			c.addLegacy(l)
+		}
 		detail := ""
 		if !sub.Verified {
 			detail = firstFailure(sub)
@@ -209,6 +242,7 @@ func VerifyPresentation(vp *credential.VerifiablePresentation, challenge string,
 	}
 
 	c.rep.Verified = c.ok
+	c.rep.Legacy = c.legacy
 	return c.rep
 }
 

@@ -45,6 +45,12 @@ func (f *fakeConfirmer) ConfirmAnchor(_ context.Context, txHash, bundleID string
 // classification + tamper-detection on top of it.
 func buildPortable(t *testing.T, anchored bool) *evidence.PortableEvidencePackage {
 	t.Helper()
+	return buildPortableFor(t, anchored, [32]byte{7}, "outcome-vk")
+}
+
+// buildPortableFor builds the same bundle with the state root and the outcome id the caller names (the outcome id is the consumer a state root proof is bound to).
+func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID string) *evidence.PortableEvidencePackage {
+	t.Helper()
 	planHash := sha256.Sum256([]byte("vk-plan"))
 	outcomeDigest := sha256.Sum256([]byte("vk-outcome-canonical"))
 
@@ -61,7 +67,8 @@ func buildPortable(t *testing.T, anchored bool) *evidence.PortableEvidencePackag
 		PlanID:            "plan-vk",
 		Level:             evidence.EvidenceLevelFull,
 		Chain:             chain,
-		StateRoot:         [32]byte{7},
+		StateRoot:         stateRoot,
+		OutcomeID:         outcomeID,
 		PolicyDecisions:   []evidence.DecisionProofRef{{PolicyType: "transfer", RuleID: "allow", Decision: "allow", BlockHeight: 1}},
 		ApprovalEvidence:  []evidence.ApprovalEvidenceRef{{StageID: "s1", Identity: "acc://approver.acme", Role: "approver", PlanHash: planHash}},
 		ExternalProofs:    []evidence.ExternalProofRef{{SourceChain: "acc", ProofType: "groth16", Verified: true}},

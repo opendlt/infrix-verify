@@ -18,13 +18,16 @@ import (
 // new file is copied over and the pin is updated deliberately, in the same commit as whatever made this implementation agree with it.
 //
 // vectorsSHA256 is over the file with line endings normalised to LF (a Windows checkout may rewrite them).
-const vectorsSHA256 = "ab7dce2405644eb63e30ad1c9dfc2a6fbc9676437f621cd9cfebef4e3cca0284"
+const vectorsSHA256 = "e1c5b1b073a3cbf8608913c1a21e33929d686330e95d9329037bdfcdf2bf4a07"
 
 const vectorsPath = "testdata/state-root-vectors.json"
 
 type vectorLeaf struct {
-	Height uint64 `json:"height"`
-	Root   string `json:"root"`
+	Height         uint64 `json:"height"`
+	Root           string `json:"root"`
+	Consumer       string `json:"consumer,omitempty"`
+	ConsumerDigest string `json:"consumerDigest,omitempty"`
+	LeafHash       string `json:"leafHash"`
 }
 
 type vectorProof struct {
@@ -38,22 +41,38 @@ type vectorTree struct {
 	Proofs []vectorProof `json:"proofs"`
 }
 
+type vectorConsistency struct {
+	First    uint64   `json:"first"`
+	Second   uint64   `json:"second"`
+	FirstMth string   `json:"firstMth"`
+	Path     []string `json:"path"`
+}
+
+type vectorAnchor struct {
+	Roots       []string `json:"roots"`
+	FirstHeight uint64   `json:"firstHeight"`
+	LastHeight  uint64   `json:"lastHeight"`
+}
+
 type vectorDocCase struct {
-	Name           string              `json:"name"`
-	Document       json.RawMessage     `json:"document,omitempty"`
-	BundleRoot     string              `json:"bundleRoot"`
-	Anchors        map[string][]string `json:"anchors,omitempty"`
-	AnchorError    string              `json:"anchorError,omitempty"`
-	NoReader       bool                `json:"noReader,omitempty"`
-	Verdict        string              `json:"verdict"`
-	DetailContains []string            `json:"detailContains"`
+	Name           string                  `json:"name"`
+	Document       json.RawMessage         `json:"document,omitempty"`
+	BundleRoot     string                  `json:"bundleRoot"`
+	ConsumerID     string                  `json:"consumerId,omitempty"`
+	Anchors        map[string]vectorAnchor `json:"anchors,omitempty"`
+	AnchorError    string                  `json:"anchorError,omitempty"`
+	NoReader       bool                    `json:"noReader,omitempty"`
+	Verdict        string                  `json:"verdict"`
+	DetailContains []string                `json:"detailContains"`
 }
 
 type vectorFile struct {
-	SealDomain string          `json:"sealDomain"`
-	Leaves     []vectorLeaf    `json:"leaves"`
-	Trees      []vectorTree    `json:"trees"`
-	Documents  []vectorDocCase `json:"documents"`
+	SealDomain     string              `json:"sealDomain"`
+	ConsumerDomain string              `json:"consumerDomain"`
+	Leaves         []vectorLeaf        `json:"leaves"`
+	Trees          []vectorTree        `json:"trees"`
+	Consistency    []vectorConsistency `json:"consistency"`
+	Documents      []vectorDocCase     `json:"documents"`
 }
 
 func loadVectors(t *testing.T) vectorFile {
@@ -73,31 +92,69 @@ func loadVectors(t *testing.T) vectorFile {
 	return vf
 }
 
+func mustDecode(t *testing.T, s string) [32]byte {
+	t.Helper()
+	h, err := decode32(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+func mustPath(t *testing.T, in []string) [][32]byte {
+	t.Helper()
+	p, err := decodePath(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// Every leaf of the vectors hashes to the leaf hash the runtime computed, a consumer leaf commits to its consumer's digest, and a root-change leaf and a consumer
+// leaf of the same height and root hash differently (two kinds that cannot be mistaken for each other).
+func TestEveryLeafHashAndEveryConsumerDigestOfTheVectorsIsReproduced(t *testing.T) {
+	vf := loadVectors(t)
+	if vf.SealDomain != SealDomain || vf.ConsumerDomain != ConsumerDomain {
+		t.Fatalf("the vectors use domains %q and %q, this package %q and %q", vf.SealDomain, vf.ConsumerDomain, SealDomain, ConsumerDomain)
+	}
+	consumers := 0
+	for i, l := range vf.Leaves {
+		root := mustDecode(t, l.Root)
+		if got := hex.EncodeToString(func() []byte { h := leafHash(l.Height, root, l.Consumer); return h[:] }()); got != l.LeafHash {
+			t.Fatalf("leaf %d hashes to %s, the vectors say %s", i, got, l.LeafHash)
+		}
+		if l.Consumer != "" {
+			consumers++
+			d := ConsumerDigest(l.Consumer)
+			if hex.EncodeToString(d[:]) != l.ConsumerDigest {
+				t.Fatalf("leaf %d: the digest of %q is %x, the vectors say %s", i, l.Consumer, d, l.ConsumerDigest)
+			}
+			if leafHash(l.Height, root, l.Consumer) == leafHash(l.Height, root, "") {
+				t.Fatalf("leaf %d: a consumer leaf and a root-change leaf of the same height and root hash alike", i)
+			}
+		}
+	}
+	if consumers != 10 {
+		t.Fatalf("%d consumer leaves in the vectors, want the 10 the runtime generates", consumers)
+	}
+}
+
 func TestEveryAuditPathOfEveryTreeSizeToFortyComputesTheSealTheVectorsName(t *testing.T) {
 	vf := loadVectors(t)
-	if vf.SealDomain != SealDomain {
-		t.Fatalf("the vectors seal under %q, this package under %q", vf.SealDomain, SealDomain)
-	}
 	if len(vf.Trees) != 40 {
 		t.Fatalf("%d trees in the vectors, want every size 1..40", len(vf.Trees))
 	}
 	proofs := 0
 	for _, tr := range vf.Trees {
-		sealed, err := decode32(tr.Sealed)
-		if err != nil {
-			t.Fatal(err)
-		}
+		sealed := mustDecode(t, tr.Sealed)
 		if uint64(len(tr.Proofs)) != tr.Size {
 			t.Fatalf("size %d has %d proofs, want one per leaf", tr.Size, len(tr.Proofs))
 		}
 		for _, vp := range tr.Proofs {
 			leaf := vf.Leaves[vp.Index]
-			root, _ := decode32(leaf.Root)
-			path := make([][32]byte, len(vp.Path))
-			for i, s := range vp.Path {
-				path[i], _ = decode32(s)
-			}
-			got, err := SealedRootOf(vp.Index, tr.Size, leaf.Height, root, path)
+			root := mustDecode(t, leaf.Root)
+			path := mustPath(t, vp.Path)
+			got, err := SealedRootOf(vp.Index, tr.Size, leaf.Height, root, leaf.Consumer, path)
 			if err != nil {
 				t.Fatalf("size %d leaf %d: %v", tr.Size, vp.Index, err)
 			}
@@ -108,8 +165,17 @@ func TestEveryAuditPathOfEveryTreeSizeToFortyComputesTheSealTheVectorsName(t *te
 			if len(path) > 0 {
 				bad := append([][32]byte(nil), path...)
 				bad[0][0] ^= 1
-				if g, err := SealedRootOf(vp.Index, tr.Size, leaf.Height, root, bad); err == nil && g == sealed {
+				if g, err := SealedRootOf(vp.Index, tr.Size, leaf.Height, root, leaf.Consumer, bad); err == nil && g == sealed {
 					t.Fatalf("size %d leaf %d: a flipped sibling computes the same seal", tr.Size, vp.Index)
+				}
+			}
+			// a consumer leaf proves only for its own consumer
+			if leaf.Consumer != "" {
+				if g, err := SealedRootOf(vp.Index, tr.Size, leaf.Height, root, leaf.Consumer+"x", path); err == nil && g == sealed {
+					t.Fatalf("size %d leaf %d: another consumer computes the same seal", tr.Size, vp.Index)
+				}
+				if g, err := SealedRootOf(vp.Index, tr.Size, leaf.Height, root, "", path); err == nil && g == sealed {
+					t.Fatalf("size %d leaf %d: the leaf proves with its consumer removed", tr.Size, vp.Index)
 				}
 			}
 			proofs++
@@ -120,25 +186,83 @@ func TestEveryAuditPathOfEveryTreeSizeToFortyComputesTheSealTheVectorsName(t *te
 	}
 }
 
+// Every pair of sizes 1 <= first <= second <= 40 has a consistency proof in the vectors; each verifies, computes the second tree's seal the vectors name, and
+// fails when any element is flipped, dropped or added, when the first hash is not the first tree's, and when the sizes are not the proof's.
+func TestEveryConsistencyProofOfEveryPairOfSizesToFortyVerifies(t *testing.T) {
+	vf := loadVectors(t)
+	if len(vf.Consistency) != 40*41/2 {
+		t.Fatalf("%d consistency vectors, want %d (every pair 1 <= first <= second <= 40)", len(vf.Consistency), 40*41/2)
+	}
+	for _, c := range vf.Consistency {
+		firstSealed := mustDecode(t, vf.Trees[c.First-1].Sealed)
+		secondSealed := mustDecode(t, vf.Trees[c.Second-1].Sealed)
+		firstMth := mustDecode(t, c.FirstMth)
+		path := mustPath(t, c.Path)
+		if seal(c.First, firstMth) != firstSealed {
+			t.Fatalf("(%d,%d): the vectors' first hash does not seal to the first tree's sealed root", c.First, c.Second)
+		}
+		secondMth, err := VerifyConsistency(c.First, c.Second, firstMth, path)
+		if err != nil {
+			t.Fatalf("(%d,%d): %v", c.First, c.Second, err)
+		}
+		if seal(c.Second, secondMth) != secondSealed {
+			t.Fatalf("(%d,%d): the proof computes a second tree whose seal is not the one the vectors name", c.First, c.Second)
+		}
+		if len(path) > 0 {
+			flipped := append([][32]byte(nil), path...)
+			flipped[len(flipped)-1][5] ^= 0x80
+			if sm, err := VerifyConsistency(c.First, c.Second, firstMth, flipped); err == nil && seal(c.Second, sm) == secondSealed {
+				t.Fatalf("(%d,%d): a flipped last element still proves", c.First, c.Second)
+			}
+			if sm, err := VerifyConsistency(c.First, c.Second, firstMth, path[1:]); err == nil && seal(c.Second, sm) == secondSealed {
+				t.Fatalf("(%d,%d): a dropped first element still proves", c.First, c.Second)
+			}
+		}
+		extra := append(append([][32]byte(nil), path...), [32]byte{9})
+		if sm, err := VerifyConsistency(c.First, c.Second, firstMth, extra); err == nil && seal(c.Second, sm) == secondSealed {
+			t.Fatalf("(%d,%d): an extra element still proves", c.First, c.Second)
+		}
+		wrongFirst := firstMth
+		wrongFirst[0] ^= 1
+		// (for a first tree whose size is a power of two the first hash IS the first element of the proof, so the proof is self-consistent with it; what refuses it
+		// is the seal of the second tree it computes, which is the comparison the caller makes)
+		if sm, err := VerifyConsistency(c.First, c.Second, wrongFirst, path); err == nil && seal(c.Second, sm) == secondSealed {
+			t.Fatalf("(%d,%d): a first hash that is not the first tree's still proves the second tree's seal", c.First, c.Second)
+		}
+		if c.Second < 40 {
+			if sm, err := VerifyConsistency(c.First, c.Second+1, firstMth, path); err == nil && seal(c.Second+1, sm) == mustDecode(t, vf.Trees[c.Second].Sealed) {
+				t.Fatalf("(%d,%d): the proof verifies for a larger second tree", c.First, c.Second)
+			}
+		}
+	}
+	// a first tree larger than the second is no prefix of it, and an empty first tree proves nothing
+	if _, err := VerifyConsistency(5, 4, [32]byte{}, nil); err == nil {
+		t.Error("a first tree larger than the second verified")
+	}
+	if _, err := VerifyConsistency(0, 4, [32]byte{}, nil); err == nil {
+		t.Error("an empty first tree verified")
+	}
+}
+
 type vectorReader struct {
-	anchors map[string][][32]byte
+	anchors map[string]AnchorEntry
 	err     error
 }
 
-func (r vectorReader) RootsAt(_ context.Context, tx string) ([][32]byte, error) {
+func (r vectorReader) AnchorAt(_ context.Context, tx string) (AnchorEntry, error) {
 	if r.err != nil {
-		return nil, r.err
+		return AnchorEntry{}, r.err
 	}
-	roots, ok := r.anchors[tx]
+	e, ok := r.anchors[tx]
 	if !ok {
-		return nil, errors.New("no such transaction")
+		return AnchorEntry{}, errors.New("no such transaction")
 	}
-	return roots, nil
+	return e, nil
 }
 
 func TestEveryDocumentCaseOfTheVectorsGetsItsVerdict(t *testing.T) {
 	vf := loadVectors(t)
-	if len(vf.Documents) < 20 {
+	if len(vf.Documents) < 40 {
 		t.Fatalf("%d document cases in the vectors", len(vf.Documents))
 	}
 	verdicts := map[string]int{}
@@ -150,22 +274,23 @@ func TestEveryDocumentCaseOfTheVectorsGetsItsVerdict(t *testing.T) {
 				t.Fatalf("%s: %v", c.Name, err)
 			}
 		}
-		bundleRoot, _ := decode32(c.BundleRoot)
+		bundleRoot := mustDecode(t, c.BundleRoot)
 		var reader AnchorReader
 		if !c.NoReader {
-			vr := vectorReader{anchors: map[string][][32]byte{}}
-			for tx, roots := range c.Anchors {
-				for _, r := range roots {
-					h, _ := decode32(r)
-					vr.anchors[tx] = append(vr.anchors[tx], h)
+			vr := vectorReader{anchors: map[string]AnchorEntry{}}
+			for tx, a := range c.Anchors {
+				e := AnchorEntry{FirstHeight: a.FirstHeight, LastHeight: a.LastHeight}
+				for _, r := range a.Roots {
+					e.Roots = append(e.Roots, mustDecode(t, r))
 				}
+				vr.anchors[tx] = e
 			}
 			if c.AnchorError != "" {
 				vr.err = errors.New(c.AnchorError)
 			}
 			reader = vr
 		}
-		res := Check(context.Background(), doc, bundleRoot, reader)
+		res := Check(context.Background(), doc, bundleRoot, c.ConsumerID, reader)
 		if string(res.Verdict) != c.Verdict {
 			t.Fatalf("%s: verdict %s (%s), want %s", c.Name, res.Verdict, res.Detail, c.Verdict)
 		}
@@ -178,5 +303,115 @@ func TestEveryDocumentCaseOfTheVectorsGetsItsVerdict(t *testing.T) {
 	}
 	if verdicts["pass"] == 0 || verdicts["skip"] == 0 || verdicts["fail"] == 0 {
 		t.Fatalf("the vectors do not exercise every outcome: %v", verdicts)
+	}
+}
+
+// passingCase returns the vectors' passing delayed-anchor document with its bundle root, consumer id and reader, to mutate one thing at a time.
+func passingCase(t *testing.T) (*Document, [32]byte, string, vectorReader) {
+	t.Helper()
+	vf := loadVectors(t)
+	for _, c := range vf.Documents {
+		if c.Name != "a proven leaf recorded in the gap of a delayed anchor passes" {
+			continue
+		}
+		doc := &Document{}
+		if err := json.Unmarshal(c.Document, doc); err != nil {
+			t.Fatal(err)
+		}
+		vr := vectorReader{anchors: map[string]AnchorEntry{}}
+		for tx, a := range c.Anchors {
+			e := AnchorEntry{FirstHeight: a.FirstHeight, LastHeight: a.LastHeight}
+			for _, r := range a.Roots {
+				e.Roots = append(e.Roots, mustDecode(t, r))
+			}
+			vr.anchors[tx] = e
+		}
+		return doc, mustDecode(t, c.BundleRoot), c.ConsumerID, vr
+	}
+	t.Fatal("the vectors have no passing delayed-anchor case")
+	return nil, [32]byte{}, "", vectorReader{}
+}
+
+func copyDoc(d *Document) *Document {
+	c := *d
+	if d.Prior != nil {
+		p := *d.Prior
+		c.Prior = &p
+	}
+	return &c
+}
+
+// The reader refuses what it does not read, whatever else is true of the document: a version-1 document that carries a consumer and a valid proof, and a status it
+// does not know, are skips and never a pass.
+func TestADocumentOfAVersionOrStatusTheVerifierDoesNotReadIsNeverAPass(t *testing.T) {
+	doc, root, consumer, reader := passingCase(t)
+	if res := Check(context.Background(), doc, root, consumer, reader); res.Verdict != VerdictPass {
+		t.Fatalf("premise: the case does not pass: %+v", res)
+	}
+	v1 := copyDoc(doc)
+	v1.Version = documentVersionV1
+	if res := Check(context.Background(), v1, root, consumer, reader); res.Verdict != VerdictSkip || !strings.Contains(res.Detail, "no consumer recorded") {
+		t.Errorf("a version 1 document carrying a consumer and a valid proof: %+v", res)
+	}
+	odd := copyDoc(doc)
+	odd.Status = Status("bogus")
+	if res := Check(context.Background(), odd, root, consumer, reader); res.Verdict != VerdictSkip || !strings.Contains(res.Detail, "does not read") {
+		t.Errorf("a status the verifier does not know: %+v", res)
+	}
+}
+
+// The prior's sealed root must be the seal of the size and tree hash the document gives for it: a root L0 DOES list, from another history, beside the real size and
+// hash of this one proves nothing, and the consistency proof alone cannot see it (it speaks of the size and hash, not of what L0 listed).
+func TestAPriorWhoseListedRootIsNotTheSealOfItsSizeAndHashIsRefused(t *testing.T) {
+	doc, root, consumer, reader := passingCase(t)
+	other := [32]byte{0xfe, 0xed}
+	priorTx := doc.Prior.Anchor.TxHash
+	e := reader.anchors[priorTx]
+	e.Roots = append(e.Roots, other)
+	reader.anchors[priorTx] = e
+	forged := copyDoc(doc)
+	forged.Prior.AccumulatorRoot = hex.EncodeToString(other[:])
+	res := Check(context.Background(), forged, root, consumer, reader)
+	if res.Verdict != VerdictFail || !strings.Contains(res.Detail, "not shown to be a prefix") {
+		t.Fatalf("a prior root that is not the seal of its size and hash: %+v", res)
+	}
+}
+
+// A first tree larger than the second is no prefix of it, however the proof is shaped (a first tree of a power-of-two size with its own hash as the whole proof would
+// otherwise verify against nothing).
+func TestAFirstTreeLargerThanTheSecondIsNeverAPrefixOfItForAnyProofShape(t *testing.T) {
+	h := [32]byte{1}
+	for _, c := range [][2]uint64{{2, 1}, {4, 3}, {8, 5}, {4, 1}, {3, 2}} {
+		if _, err := VerifyConsistency(c[0], c[1], h, nil); err == nil {
+			t.Errorf("(%d,%d) with an empty proof verified", c[0], c[1])
+		}
+		if _, err := VerifyConsistency(c[0], c[1], h, [][32]byte{{2}}); err == nil {
+			t.Errorf("(%d,%d) with a one-element proof verified", c[0], c[1])
+		}
+	}
+}
+
+// A proof with an element too many is refused by the verification itself, not only by the seal that would then not match.
+func TestAConsistencyProofWithAnExtraElementIsRefusedByTheVerificationItself(t *testing.T) {
+	vf := loadVectors(t)
+	checked := 0
+	for _, c := range vf.Consistency {
+		if c.First == c.Second {
+			continue
+		}
+		extra := append(mustPath(t, c.Path), [32]byte{9})
+		if _, err := VerifyConsistency(c.First, c.Second, mustDecode(t, c.FirstMth), extra); err == nil {
+			t.Fatalf("(%d,%d): a proof with an extra element verified", c.First, c.Second)
+		}
+		// and one with its last element missing: the proof is not used up, so it proves nothing about the second tree
+		if full := mustPath(t, c.Path); len(full) >= 2 {
+			if _, err := VerifyConsistency(c.First, c.Second, mustDecode(t, c.FirstMth), full[:len(full)-1]); err == nil {
+				t.Fatalf("(%d,%d): a proof missing its last element verified", c.First, c.Second)
+			}
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no consistency vector was checked")
 	}
 }

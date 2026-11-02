@@ -17,7 +17,7 @@ import (
 // standalone infrix-verify module — must be able to verify a portable proof
 // with ZERO trust in (and zero compile-time dependency on) the live Accumulate
 // node. Concretely its transitive dependency graph MUST NOT contain ANY package
-// from the main Infrix runtime module (github.com/AccumulateNetwork/infrix/...)
+// from the main Infrix runtime module (github.com/opendlt/infrix/..., formerly github.com/AccumulateNetwork/infrix/...)
 // — that includes the live L0 client (pkg/l0), the composition root
 // (pkg/production), the test-network harness (pkg/devnet), and the runtime
 // evidence/governance packages.
@@ -36,8 +36,13 @@ import (
 func TestVerifierCoreHasNoRuntimeNodeDependency(t *testing.T) {
 	// Any dependency under the MAIN runtime module is forbidden. The trailing
 	// slash keeps this from matching the verifier's own module
-	// (github.com/opendlt/infrix-verify/...), which is allowed.
-	const runtimeModulePrefix = "github.com/AccumulateNetwork/infrix/"
+	// (github.com/opendlt/infrix-verify/...) and the schema module
+	// (github.com/opendlt/infrix-schema/...), which are allowed.
+	//
+	// BOTH module paths the runtime has had are forbidden: the fence named only
+	// github.com/AccumulateNetwork/infrix/ after the module was renamed to
+	// github.com/opendlt/infrix, so it matched nothing and would have passed a
+	// verifier that imported the node. fenceLeaks is held to that by its own test.
 
 	// Empty allowlist: the verifier core may import ZERO packages from the main
 	// runtime module. Everything it needs lives in infrix-schema (evidence wire
@@ -48,16 +53,7 @@ func TestVerifierCoreHasNoRuntimeNodeDependency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("go list -deps infrix-verify/verifykit failed: %v\n%s", err, out)
 	}
-	var leaks []string
-	for _, line := range strings.Split(string(out), "\n") {
-		dep := strings.TrimSpace(line)
-		if dep == "" {
-			continue
-		}
-		if strings.HasPrefix(dep, runtimeModulePrefix) && !allowed[dep] {
-			leaks = append(leaks, dep)
-		}
-	}
+	leaks := fenceLeaks(string(out), runtimeModulePrefixes, allowed)
 	if len(leaks) > 0 {
 		t.Errorf("the verifier core (infrix-verify/verifykit) transitively imports %d package(s) from "+
 			"the main runtime module: %s\nThe verifier must depend only on the published infrix-schema "+
@@ -65,5 +61,47 @@ func TestVerifierCoreHasNoRuntimeNodeDependency(t *testing.T) {
 			"pkg/verifyl0native adapter in the main module). Move whatever pulled these into infrix-schema "+
 			"or behind a port. (docs/extraction-plan M4)",
 			len(leaks), strings.Join(leaks, ", "))
+	}
+}
+
+// runtimeModulePrefixes are the module paths the Infrix runtime has had; a dependency under either is forbidden. The trailing slash keeps them from matching this
+// module (github.com/opendlt/infrix-verify/...) and the schema module (github.com/opendlt/infrix-schema/...). The fence AND its bite test read this one variable, so
+// narrowing it fails the bite test.
+var runtimeModulePrefixes = []string{"github.com/opendlt/infrix/", "github.com/AccumulateNetwork/infrix/"}
+
+// fenceLeaks returns the dependencies in a `go list -deps` output that sit under a forbidden module prefix and are not allowed.
+func fenceLeaks(goListDeps string, prefixes []string, allowed map[string]bool) []string {
+	var leaks []string
+	for _, line := range strings.Split(goListDeps, "\n") {
+		dep := strings.TrimSpace(line)
+		if dep == "" || allowed[dep] {
+			continue
+		}
+		for _, p := range prefixes {
+			if strings.HasPrefix(dep, p) {
+				leaks = append(leaks, dep)
+				break
+			}
+		}
+	}
+	return leaks
+}
+
+// The fence has teeth: given the runtime module under either of its names it reports a leak, and given this module, the schema module or the standard library it
+// does not.
+func TestTheIsolationFenceBitesAnImportOfTheRuntimeModuleUnderEitherName(t *testing.T) {
+	prefixes := runtimeModulePrefixes
+	deps := "fmt\ngithub.com/opendlt/infrix-schema/evidence\ngithub.com/opendlt/infrix-verify/stateroot\ngithub.com/opendlt/infrix-verify/verifykit\n"
+	if got := fenceLeaks(deps, prefixes, nil); len(got) != 0 {
+		t.Fatalf("the fence flagged %v, which are the verifier's own and the schema's", got)
+	}
+	for _, leak := range []string{"github.com/opendlt/infrix/pkg/l0", "github.com/AccumulateNetwork/infrix/pkg/production"} {
+		if got := fenceLeaks(deps+leak+"\n", prefixes, nil); len(got) != 1 || got[0] != leak {
+			t.Fatalf("the fence did not flag %s: %v", leak, got)
+		}
+	}
+	// the OLD name alone would have missed the current one: that is the defect this test pins
+	if got := fenceLeaks("github.com/opendlt/infrix/pkg/l0\n", []string{"github.com/AccumulateNetwork/infrix/"}, nil); len(got) != 0 {
+		t.Fatal("premise: the old prefix alone matched the current module path")
 	}
 }

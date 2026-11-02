@@ -25,6 +25,7 @@ import (
 
 	"github.com/opendlt/infrix-schema/assurance"
 	"github.com/opendlt/infrix-schema/evidence"
+	"github.com/opendlt/infrix-verify/stateroot"
 	"github.com/opendlt/infrix-verify/witness"
 )
 
@@ -225,6 +226,19 @@ type Options struct {
 	// RequireWitnessOperators fails verification closed unless the valid
 	// witnesses span at least this many DISTINCT independent operators.
 	RequireWitnessOperators int
+
+	// StateRootProof is the document an export attached beside the package under stateroot.DocumentKey: an inclusion proof of the bundle's state root into a
+	// root-history seal the node anchored (package stateroot). The application reads it from the exported file (verifykit parses no files); nil means none was
+	// attached, and the state_root_accumulator check is then a SKIP that leaves every verdict exactly as it was (every bundle exported before the node kept a root
+	// history). StateRootProofError, when non-empty, says a document was attached that did not decode: the check then FAILS with that text.
+	StateRootProof      *stateroot.Document
+	StateRootProofError string
+	// StateRootAnchors reads the roots an L0 anchor entry lists (the verifier's port, like L0Confirmer). Nil means no L0 endpoint was supplied: a consistent
+	// proof is then a SKIP, exactly as l0_anchor is, because that the node anchored the seal is not independently confirmed.
+	StateRootAnchors stateroot.AnchorReader
+	// RequireStateRootProof turns a SKIP (no document, awaiting the next anchor, no endpoint) into a failure, for a verifier that accepts only a bundle whose state
+	// root is proven against L0.
+	RequireStateRootProof bool
 }
 
 // Verify runs the full verification pipeline against a portable evidence
@@ -278,6 +292,12 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	// 9-11. Live L0 confirmation — fetch the anchor tx directly from L0.
 	l0Confirmed := report.checkL0Anchor(ctx, &bundle, anchored, opts.L0Confirmer)
 	externalProofConfirmed := report.checkExternalProof(ctx, &bundle, opts.ExternalProofConfirmer)
+
+	// The bundle's state root against the node's anchored root history. It changes no level (the ladder has no state-root rung); a FAIL is a failure of the
+	// bundle, and so of the cryptographic verdict below.
+	if bundleParsed {
+		report.checkStateRootProof(ctx, &bundle, opts)
+	}
 
 	// crypto verdict = every check so far passed (these are all the
 	// offline cryptographic + structural bindings; L0 is separate).
@@ -477,6 +497,27 @@ func (r *Report) checkAnchorProof(pkg *evidence.PortableEvidencePackage, bundle 
 
 // checkL0Anchor performs the live L0 confirmation and returns whether the
 // anchor was independently confirmed against L0.
+// checkStateRootProof adds the state_root_accumulator check (package stateroot holds the rule).
+func (r *Report) checkStateRootProof(ctx context.Context, bundle *evidence.EvidenceBundle, opts Options) {
+	var res stateroot.Result
+	if opts.StateRootProofError != "" {
+		res = stateroot.Result{Verdict: stateroot.VerdictFail, Detail: opts.StateRootProofError}
+	} else {
+		res = stateroot.Check(ctx, opts.StateRootProof, bundle.StateRoot, opts.StateRootAnchors)
+	}
+	if opts.RequireStateRootProof && res.Verdict == stateroot.VerdictSkip {
+		res = stateroot.Result{Verdict: stateroot.VerdictFail, Detail: "a proven state root is required but it is not: " + res.Detail}
+	}
+	switch res.Verdict {
+	case stateroot.VerdictPass:
+		r.add(stateroot.CheckName, CheckPass, res.Detail)
+	case stateroot.VerdictFail:
+		r.add(stateroot.CheckName, CheckFail, res.Detail)
+	default:
+		r.add(stateroot.CheckName, CheckSkip, res.Detail)
+	}
+}
+
 func (r *Report) checkL0Anchor(ctx context.Context, bundle *evidence.EvidenceBundle, anchored bool, confirmer L0AnchorConfirmer) bool {
 	if !anchored {
 		r.add("l0_anchor", CheckSkip, "bundle is not anchored")

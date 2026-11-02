@@ -233,7 +233,7 @@ type Options struct {
 	// history). StateRootProofError, when non-empty, says a document was attached that did not decode: the check then FAILS with that text.
 	StateRootProof      *stateroot.Document
 	StateRootProofError string
-	// StateRootAnchors reads the roots an L0 anchor entry lists (the verifier's port, like L0Confirmer). Nil means no L0 endpoint was supplied: a consistent
+	// StateRootAnchors reads an L0 anchor entry, its listed roots and its canonical window (the verifier's port, like L0Confirmer). Nil means no L0 endpoint was supplied: a consistent
 	// proof is then a SKIP, exactly as l0_anchor is, because that the node anchored the seal is not independently confirmed.
 	StateRootAnchors stateroot.AnchorReader
 	// RequireStateRootProof turns a SKIP (no document, awaiting the next anchor, no endpoint) into a failure, for a verifier that accepts only a bundle whose state
@@ -503,7 +503,8 @@ func (r *Report) checkStateRootProof(ctx context.Context, bundle *evidence.Evide
 	if opts.StateRootProofError != "" {
 		res = stateroot.Result{Verdict: stateroot.VerdictFail, Detail: opts.StateRootProofError}
 	} else {
-		res = stateroot.Check(ctx, opts.StateRootProof, bundle.StateRoot, opts.StateRootAnchors)
+		// the leaf is bound to the bundle by its OUTCOME id: the node recorded it at the moment it read its root to finalize that outcome
+		res = stateroot.Check(ctx, opts.StateRootProof, bundle.StateRoot, bundle.OutcomeID, opts.StateRootAnchors)
 	}
 	if opts.RequireStateRootProof && res.Verdict == stateroot.VerdictSkip {
 		res = stateroot.Result{Verdict: stateroot.VerdictFail, Detail: "a proven state root is required but it is not: " + res.Detail}

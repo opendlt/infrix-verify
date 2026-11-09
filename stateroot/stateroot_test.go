@@ -855,3 +855,27 @@ func TestTheRepositoryPinsTheVectorFileToLFInGitattributes(t *testing.T) {
 		}
 	}
 }
+
+// Every status and every version a document can carry is read in the runtime's order, the version first: a version 1 document and a version this verifier does not read are skips
+// whatever their status or their statement says, and the detail names the version (the status never gets to speak).
+func TestEveryStatusAndEveryVersionIsReadInTheRuntimesOrderTheVersionFirst(t *testing.T) {
+	checkpointed := confirmedCase(t)
+	proven := vectorCase(t, "a proven leaf recorded in the gap of a delayed anchor passes")
+	for _, status := range []string{"proven", "awaiting_anchor", "unavailable", "bogus"} {
+		for version, want := range map[string]string{documentVersionV1: "version 1", "infrix-state-root-proof-v9": "does not read", "": "does not read"} {
+			base := checkpointed
+			if status == "proven" {
+				base = proven
+			}
+			doc := docOf(t, base, func(m map[string]any) {
+				m["status"] = status
+				if version == "" {
+					delete(m, "version")
+				} else {
+					m["version"] = version
+				}
+			})
+			wantResult(t, fmt.Sprintf("%s %q", status, version), checkOf(t, base, doc, readerOfCase(t, base)), VerdictSkip, want)
+		}
+	}
+}

@@ -18114,6 +18114,350 @@
    "path": null
   }
  ],
+ "checkpoints": [
+  {
+   "size": 1,
+   "compact": [
+    "4c53cf2d704df5d2545f1a110573df6bcb356c3fe454c8deda94ac98b56d2fc6"
+   ],
+   "sealed": "c1f745eced761b4b5036cc56084b5b217c805f38a23ebeb886d2b1fb0e604593"
+  },
+  {
+   "size": 2,
+   "compact": [
+    "d615264ec66a6fb92f99d85dcd28fff9f70bea118b3bb37195def5cf7986d6cc"
+   ],
+   "sealed": "6e5ae7fde3ff52d2720b4b4ea963646f9de49be3a5b75a4eb67bd8f54ab9e523"
+  },
+  {
+   "size": 3,
+   "compact": [
+    "d615264ec66a6fb92f99d85dcd28fff9f70bea118b3bb37195def5cf7986d6cc",
+    "d8af2d6dc01afc37646b47311333a5424d58809eac2efed0bbce4448a860f65f"
+   ],
+   "sealed": "e039750a307b1f72583351d6f920567b5f90397e8c8206aa9bad0e1426b85159"
+  },
+  {
+   "size": 4,
+   "compact": [
+    "30d81e5eeda38ae009c8fb032328ce2f972f025eaafb92018ade5804539df856"
+   ],
+   "sealed": "cb406e531c5f355ea36c33eccd66a3740a9579de0323aef98d6573675a8630e0"
+  },
+  {
+   "size": 5,
+   "compact": [
+    "30d81e5eeda38ae009c8fb032328ce2f972f025eaafb92018ade5804539df856",
+    "32371e002c3642f4b381a4039586879f5b8e79b540d231dd6403ae0a34a557ef"
+   ],
+   "sealed": "b19f73093e28e71f2d8fd1b0b2af96f9b4396f9690bb22f77f3de8be9b5e75de"
+  },
+  {
+   "size": 6,
+   "compact": [
+    "30d81e5eeda38ae009c8fb032328ce2f972f025eaafb92018ade5804539df856",
+    "63b2c030d81d2111dd51863984e1d37a97c5d5d956eed90b42cd09b26f39a4d2"
+   ],
+   "sealed": "1c3e310c1fb1281bf19053afe1f2fc7034a83bf782309301e574c16179a7fcae"
+  },
+  {
+   "size": 7,
+   "compact": [
+    "30d81e5eeda38ae009c8fb032328ce2f972f025eaafb92018ade5804539df856",
+    "63b2c030d81d2111dd51863984e1d37a97c5d5d956eed90b42cd09b26f39a4d2",
+    "d8d2cea997fecb780bbc89dc9967c3453c80b5b28c96b772bb28258f938d3db5"
+   ],
+   "sealed": "d3f92fd877666dee6f2668e1b8429d4bb097790728f93d7c92ce26849bac7160"
+  },
+  {
+   "size": 8,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7"
+   ],
+   "sealed": "c5681b947a91f10d70bf668a1b0d4791b72c1cde115c99495914e1f47f0661fb"
+  },
+  {
+   "size": 9,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7",
+    "b1eacc026e5002faf80ab595546d87e1a7ab8a26e57c17d0aca6ba9e2c6eff75"
+   ],
+   "sealed": "626eee3a2fa16d3b2b1bdf1ce746a0c8065404278f612a161afb294294252353"
+  },
+  {
+   "size": 10,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7",
+    "f98bae7cd18c9c79fcd93996872805b6fd79806b2711efdc81e3a68cbfcda3d6"
+   ],
+   "sealed": "9b5475a1fc2f32bb9966a5e9076b644456435f9cc083007d2d2915279cb60db9"
+  },
+  {
+   "size": 11,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7",
+    "f98bae7cd18c9c79fcd93996872805b6fd79806b2711efdc81e3a68cbfcda3d6",
+    "8b3de228c6e06395d51b69eb1ae9c5c151308628117433a3a5f8a20fbd4fddbb"
+   ],
+   "sealed": "b1af44d487bdfdbb6260270db9fbb0dfa8c07b6c778f1da1a78bc021f4377802"
+  },
+  {
+   "size": 12,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7",
+    "a21cccfac18ad0f02b5eb98db9079cea1858d4665f9a922940b9ab7708eea77c"
+   ],
+   "sealed": "eb2ab0c7851cd8aaec226119109a949d30972d1f9c5e1b7b1730070b05abc992"
+  },
+  {
+   "size": 13,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7",
+    "a21cccfac18ad0f02b5eb98db9079cea1858d4665f9a922940b9ab7708eea77c",
+    "ce737530234a3e148814b9effa80529b1cb5a21eaab18de8017bf16c968e22e6"
+   ],
+   "sealed": "a8263fbd7eb55a5419c0799642348ddece598f65475e697a0181d5c3e3078ba7"
+  },
+  {
+   "size": 14,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7",
+    "a21cccfac18ad0f02b5eb98db9079cea1858d4665f9a922940b9ab7708eea77c",
+    "43870ea17978979d2b390e317ea6a3ae9f6fb13a12d453380d52f96d1c1b1aaf"
+   ],
+   "sealed": "633fd095408eee204225a93bd483cdc04c43394aad0cb2e847f9f00bf647c751"
+  },
+  {
+   "size": 15,
+   "compact": [
+    "be8be47ab1635d272b21e3958428a0594278aa6b910d62a421ed32d50c4720a7",
+    "a21cccfac18ad0f02b5eb98db9079cea1858d4665f9a922940b9ab7708eea77c",
+    "43870ea17978979d2b390e317ea6a3ae9f6fb13a12d453380d52f96d1c1b1aaf",
+    "c4168f6450d4d782372064be373da4206357fd531f5a0c37cd621ba85900ad19"
+   ],
+   "sealed": "c8ae5953c26f3bc7c5f01292335267c938e0359fe4f3f2b460297a2c7ad8b7f0"
+  },
+  {
+   "size": 16,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa"
+   ],
+   "sealed": "f786a45c1fc0901f3e940acecc108fccf5654f25933493dda62bab07ed3edacc"
+  },
+  {
+   "size": 17,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "95b8d34bd775499531a7b41e586bd3f96c00171db77f5e0592a928de8890bd68"
+   ],
+   "sealed": "a40aec01e40d81612c65ba1efa266ee62b62466a437f505951bcb1d1b0bcbc6c"
+  },
+  {
+   "size": 18,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "828111dcb2ca4d874618fb8af1595ed2e8ff773d5ae7bafc1bae0f5ef2e1651d"
+   ],
+   "sealed": "e73d982c1e02f6515ee85c8eacfa2720f07ef3922446565bb92ab432ce01040e"
+  },
+  {
+   "size": 19,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "828111dcb2ca4d874618fb8af1595ed2e8ff773d5ae7bafc1bae0f5ef2e1651d",
+    "66e3d353366ca463aaeba1b4765cd698a4416803f5c7d38aa4400912ed89ceea"
+   ],
+   "sealed": "54b83b115727391f235cbb13df928827bee7bcca9f79f8880a349b353cf6a88a"
+  },
+  {
+   "size": 20,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291"
+   ],
+   "sealed": "aa4477ff616fa835a43b69f11dc2b6e6679692a9416620f1d654aeb7fd7607f2"
+  },
+  {
+   "size": 21,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+    "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+   ],
+   "sealed": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f"
+  },
+  {
+   "size": 22,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+    "15645e05789c264b750ec0c86b04a9dd47387e761b3c7e2e36dae5b6d9ba235a"
+   ],
+   "sealed": "e270bec0b556bb09cc258b458af8b1f2cef63361914c6cd8d747e98d3f2ee621"
+  },
+  {
+   "size": 23,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+    "15645e05789c264b750ec0c86b04a9dd47387e761b3c7e2e36dae5b6d9ba235a",
+    "e573cdb424292cd5ab3e2b2a12ad66cfc1d8b1c5d75572ef625f94933ddc162d"
+   ],
+   "sealed": "d76600cb7e7d49e4b65f07971a937ac397d4496210929629020ec94835381db5"
+  },
+  {
+   "size": 24,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6"
+   ],
+   "sealed": "b1388bab51896cf8da29501f211f1ec8c099b0dedac2cc7d2e3950981d6c6780"
+  },
+  {
+   "size": 25,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6",
+    "91b0fc1ae2dba200e4bb18ae93aa4edb0d341d6bee4932dd1a3c6b03e2b15818"
+   ],
+   "sealed": "9767e955a95c86849210fe8866d0e5d0e195e99ef54c6c888f200f92e4ebedea"
+  },
+  {
+   "size": 26,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6",
+    "bca0c8aa311bc8ad4c355fa62c7aee019e3bda96fa02977efd9b81269eda3489"
+   ],
+   "sealed": "b010e98727c69c0c535ff6bc7132224d03f0b9b6c0005cc4f2546e9887d16750"
+  },
+  {
+   "size": 27,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6",
+    "bca0c8aa311bc8ad4c355fa62c7aee019e3bda96fa02977efd9b81269eda3489",
+    "503a8dc6cd7389c30d75da1c1fb033faaaf8c13c6adfbaed7c02dc3d5ae03211"
+   ],
+   "sealed": "6f6408467cea526755720a2408d8fe033b88a4d3c3fa81435c3939b472ed0c31"
+  },
+  {
+   "size": 28,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6",
+    "ac4873ca3d0c97b0effdde2021ebb1bb3f759bb4b086e8ac1f845280154f87db"
+   ],
+   "sealed": "63f76fa7b8b3f48cfabdd6b655ace026b475b6f9d5a3a26109bbe3c8f2b664c9"
+  },
+  {
+   "size": 29,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6",
+    "ac4873ca3d0c97b0effdde2021ebb1bb3f759bb4b086e8ac1f845280154f87db",
+    "622cef76349e867e8897f7b463c57fccc7c60ccf61ec56b6bbbddbe89b5f8124"
+   ],
+   "sealed": "424347fdb8bfa0d1568cd32e076024312577e3c8c3388cac4e55a6a5903afb60"
+  },
+  {
+   "size": 30,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6",
+    "ac4873ca3d0c97b0effdde2021ebb1bb3f759bb4b086e8ac1f845280154f87db",
+    "6df02a0a03349ec87bde7166b6803a4d845897675cbcf9d4886601812d334e5d"
+   ],
+   "sealed": "63fc2a50bb6604aa328be4d6a599d82e499d427910c5235ab8bf07a27b3f9c37"
+  },
+  {
+   "size": 31,
+   "compact": [
+    "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+    "8cd4dd48c1c12d2514a037639654d1c1d423abf9478d407559214df6034fa3d6",
+    "ac4873ca3d0c97b0effdde2021ebb1bb3f759bb4b086e8ac1f845280154f87db",
+    "6df02a0a03349ec87bde7166b6803a4d845897675cbcf9d4886601812d334e5d",
+    "a727568346b67ad951cca1f204ad07587c12fa9e448c0effc60b9fa65725bedc"
+   ],
+   "sealed": "f44f70e0f977410a7adafe1cdcbbd9dbbad1ab1d32f6735b5cc14c7239fb7a9d"
+  },
+  {
+   "size": 32,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e"
+   ],
+   "sealed": "ab272ed2d77397583ef03b35f3bbf2f0b5c4ecedd620c126225c15925781f1ed"
+  },
+  {
+   "size": 33,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "d05025160726b45d4530d75a908c6584eecf926187aae1349dc4aade91ca6adb"
+   ],
+   "sealed": "6d50de1553abe3ea7076c69cfe9aeba7e9d15011db7dc11c9efad70b64631db9"
+  },
+  {
+   "size": 34,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "fbff00fb07efad86bde96589f9c335873e01797ed42727b806bbff9af70301d8"
+   ],
+   "sealed": "92aa650382bd4d0394d9719a9923d46c03d69f3049524192ea8ba811684348ad"
+  },
+  {
+   "size": 35,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "fbff00fb07efad86bde96589f9c335873e01797ed42727b806bbff9af70301d8",
+    "73381514c33bd7ec9fd037e34b361701bf0c78a854a19dd70ab09fd7e1d07b7e"
+   ],
+   "sealed": "f8d002b282f5503a74c5db7ba854cebd99f49b066075129e6217153cdc846310"
+  },
+  {
+   "size": 36,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "7801af318703342dfd68dc04e4e3a7fb973f42c31d8c92a8cd48be20a5ab28a1"
+   ],
+   "sealed": "8d34c2d66c7053116cd85fde40204a7dfc5b2868fd5f063cc951abdcd4aa724d"
+  },
+  {
+   "size": 37,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "7801af318703342dfd68dc04e4e3a7fb973f42c31d8c92a8cd48be20a5ab28a1",
+    "2d8c43c57cc38c92204516de162b6ecc1dfcfcfd0e3f758e182817e82ff47eb3"
+   ],
+   "sealed": "8b4666f1dca901e8373ff0dc7f43ab8c87dd2be7c0aa37b6987ee68ca5201534"
+  },
+  {
+   "size": 38,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "7801af318703342dfd68dc04e4e3a7fb973f42c31d8c92a8cd48be20a5ab28a1",
+    "1e1242caa44cad41fa67a06259ec1fbbc4d373ce36eadc2948e0d4cdce82acd6"
+   ],
+   "sealed": "5bbe91f19607a74ba4b0513921658566c4026c36d8a545307b29c285ae6b5981"
+  },
+  {
+   "size": 39,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "7801af318703342dfd68dc04e4e3a7fb973f42c31d8c92a8cd48be20a5ab28a1",
+    "1e1242caa44cad41fa67a06259ec1fbbc4d373ce36eadc2948e0d4cdce82acd6",
+    "d8fa0ddd9fbb2d69acdd9b1eebc265b59870417a3deb9fad2b2d0ba3864689d0"
+   ],
+   "sealed": "8ad7f1ca9da08c290a1f7de0d9fa78f6d1a51de96cd985afbe0166df46108323"
+  },
+  {
+   "size": 40,
+   "compact": [
+    "921882f9fb62e17359b8f60309f46e66e244cc042618f8f33e6bcb93e2254f4e",
+    "0d154ab7c6af1428b9671d2286247a6530e5be7359c2469e611bb83448e8553c"
+   ],
+   "sealed": "c9ab3095340235b666633afffc5df093083a991b794f9132aa5b39eeabb1dcbb"
+  }
+ ],
  "documents": [
   {
    "name": "no document is a skip",
@@ -20860,6 +21204,359 @@
    "verdict": "fail",
    "detailContains": [
     "prior anchor names no L0 anchor transaction"
+   ]
+  },
+  {
+   "name": "an unavailable proof that states a true checkpoint is a skip naming it",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "skip",
+   "detailContains": [
+    "checkpointed at leaf 21",
+    "folds to sealed root",
+    "no L0 endpoint was supplied"
+   ]
+  },
+  {
+   "name": "an unavailable proof that states a checkpoint with no anchor is unconfirmed",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "anchors": {
+    "cc33": {
+     "roots": [
+      "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f"
+     ],
+     "firstHeight": 150,
+     "lastHeight": 160
+    }
+   },
+   "verdict": "skip",
+   "detailContains": [
+    "names no L0 anchor"
+   ]
+  },
+  {
+   "name": "an unavailable proof whose checkpoint L0 confirms is a skip saying so",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ],
+     "anchor": {
+      "txHash": "cc33",
+      "account": "acc://anchors.acme/state"
+     }
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "anchors": {
+    "cc33": {
+     "roots": [
+      "0400000000000000000000000000000000000000000000000000000000000000",
+      "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f"
+     ],
+     "firstHeight": 150,
+     "lastHeight": 160
+    }
+   },
+   "verdict": "skip",
+   "detailContains": [
+    "L0 lists that seal"
+   ]
+  },
+  {
+   "name": "a checkpoint whose seal L0 never listed is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ],
+     "anchor": {
+      "txHash": "cc33",
+      "account": "acc://anchors.acme/state"
+     }
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "anchors": {
+    "cc33": {
+     "roots": [
+      "0400000000000000000000000000000000000000000000000000000000000000"
+     ],
+     "firstHeight": 150,
+     "lastHeight": 160
+    }
+   },
+   "verdict": "fail",
+   "detailContains": [
+    "never anchored"
+   ]
+  },
+  {
+   "name": "a checkpoint whose anchor L0 cannot be read is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ],
+     "anchor": {
+      "txHash": "cc33",
+      "account": "acc://anchors.acme/state"
+     }
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "anchorError": "connection refused",
+   "verdict": "fail",
+   "detailContains": [
+    "could not read the checkpoint's anchor from L0"
+   ]
+  },
+  {
+   "name": "a checkpoint with a flipped compact entry is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "ccb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "fail",
+   "detailContains": [
+    "the statement is false",
+    "does not fold to the sealed root"
+   ]
+  },
+  {
+   "name": "a checkpoint with a dropped compact entry is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "fail",
+   "detailContains": [
+    "the statement is false"
+   ]
+  },
+  {
+   "name": "a checkpoint with an extra compact entry is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208",
+      "0800000000000000000000000000000000000000000000000000000000000000"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "fail",
+   "detailContains": [
+    "the statement is false"
+   ]
+  },
+  {
+   "name": "a checkpoint for another size than its range is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 22,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "fail",
+   "detailContains": [
+    "the statement is false"
+   ]
+  },
+  {
+   "name": "a checkpoint naming another sealed root is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "0900000000000000000000000000000000000000000000000000000000000000",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "fail",
+   "detailContains": [
+    "does not fold to the sealed root"
+   ]
+  },
+  {
+   "name": "a checkpoint with a malformed compact entry is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 21,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "not-hex",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "fail",
+   "detailContains": [
+    "the statement is false",
+    "compact[0]"
+   ]
+  },
+  {
+   "name": "a checkpoint that seals no leaves is refused",
+   "document": {
+    "version": "infrix-state-root-proof-v2",
+    "status": "unavailable",
+    "stateRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+    "reason": "no leaf is held for this bundle",
+    "checkpoint": {
+     "size": 0,
+     "lastHeight": 160,
+     "sealedRoot": "55fc35a95aeeccab7c061dc6bd8c69240f19a91a79b189fb0b8723d64000696f",
+     "compact": [
+      "cdb8b081541de6f305f3edffb6076dc73cfcd93588ec0871a6d44d3c85a3d1fa",
+      "f54a531e5a2103683da1d74091727b181c8f99befdbc50a89d2ce73c02854291",
+      "863a583deebc8e5bf97cdf2adbde86a19ad25b5ab811b7298f8d5e83f78f1208"
+     ]
+    }
+   },
+   "bundleRoot": "afaa4e0c3e26139cc8cd9b4d37eabce3b515f5276c2d06d25e15d0d9fd4669d8",
+   "consumerId": "outcome-acc://vector.acme-13",
+   "noReader": true,
+   "verdict": "fail",
+   "detailContains": [
+    "the statement is false"
    ]
   }
  ]

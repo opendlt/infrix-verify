@@ -32,8 +32,16 @@
 // THIS IMPLEMENTATION IS INDEPENDENT ON PURPOSE. The node builds the tree and makes proofs in the Infrix runtime module (pkg/rootaccum), which this module must not
 // import (the verifier isolation fence), so the check is written again here, from the same specification, and the two are pinned by ONE file of vectors the runtime
 // repository generates and both repositories' tests read (testdata/state-root-vectors.json): every leaf hash, the seal of every tree size to 40, the audit path of
-// every leaf of every size, the consistency proof between every pair of sizes, and a table of document cases, a tamper case for every outcome of Check's rule. This
-// package only verifies; it never builds a tree.
+// every leaf of every size, the consistency proof between every pair of sizes, the compact range of every tree size (the checkpoints) and a table of document cases, a
+// tamper case for every outcome of Check's rule. This package only verifies; it never builds a tree.
+//
+// THE CHECKPOINT STATEMENT (ledger L1647). A node that checkpointed its root history dropped the leaves before the checkpoint, so a bundle recorded before it can only be
+// proven by the document exported with it, and the node answers any other such bundle with an UNAVAILABLE document that carries its own statement of the checkpoint: the
+// number of leaves sealed, the canonical height of the last of them, the sealed root over them, the compact range of their tree (the perfect subtrees of the binary
+// decomposition of the size, left to right) and, when it knows it, the L0 anchor of that seal. The statement proves NOTHING about the bundle, so it is never a pass; what it
+// can be is FALSE, and a false one is a FAIL: the compact range must be the decomposition of the size, fold (the last subtree, then each earlier one hashed over the rest)
+// to the tree hash, and the seal of the size and that hash must be the sealed root the statement names. A statement that holds is a SKIP saying so; with an L0 reader and an
+// anchor named, L0 must list the sealed root.
 package stateroot
 
 import (
@@ -43,6 +51,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/bits"
 )
 
 // SealDomain is the domain tag of the sealed root.
@@ -114,6 +123,57 @@ type Document struct {
 
 	CurrentSize        uint64 `json:"currentSize,omitempty"`
 	NewestAnchoredSize uint64 `json:"newestAnchoredSize,omitempty"`
+
+	// Checkpoint, on an unavailable document, is the node's own statement that it checkpointed its root history (ledger L1647): leaves before Size are no longer held, so a bundle recorded
+	// before it can only be proven by the document exported with it. A verifier checks the statement against the seal it names; it never reads it as a proof of the bundle.
+	Checkpoint *Checkpoint `json:"checkpoint,omitempty"`
+}
+
+// Checkpoint is a checkpoint as an unavailable document states it: the number of leaves sealed and dropped, the canonical height of the last of them, the sealed root over them (the
+// value the node pinned for an anchor and L0 holds), the compact range of their tree (the perfect subtrees of the binary decomposition of Size, left to right, lowercase hex) and, when
+// the node knows it, the L0 anchor of that seal.
+type Checkpoint struct {
+	Size       uint64     `json:"size"`
+	LastHeight uint64     `json:"lastHeight"`
+	SealedRoot string     `json:"sealedRoot"`
+	Compact    []string   `json:"compact"`
+	Anchor     *AnchorRef `json:"anchor,omitempty"`
+}
+
+// Verify checks the checkpoint against itself: the compact range must be the decomposition of Size (as many entries as Size has one bits, each of the width the bits give) and fold to
+// the tree hash the sealed root commits to together with Size. A checkpoint that fails names a range for another tree, or a seal for another size.
+func (c *Checkpoint) Verify() error {
+	if c.Size == 0 {
+		return errors.New("the checkpoint seals no leaves")
+	}
+	sealed, err := decode32(c.SealedRoot)
+	if err != nil {
+		return fmt.Errorf("sealedRoot: %w", err)
+	}
+	hashes := make([][32]byte, 0, len(c.Compact))
+	rest := c.Size
+	for i, s := range c.Compact {
+		if rest == 0 {
+			return fmt.Errorf("the compact range has more entries than the %d leaves it covers have subtrees", c.Size)
+		}
+		h, err := decode32(s)
+		if err != nil {
+			return fmt.Errorf("compact[%d]: %w", i, err)
+		}
+		hashes = append(hashes, h)
+		rest -= uint64(1) << (bits.Len64(rest) - 1) // the largest power of two in what is left: the next perfect subtree
+	}
+	if rest != 0 {
+		return fmt.Errorf("a tree of %d leaves has a compact range of %d subtrees, not %d", c.Size, bits.OnesCount64(c.Size), len(hashes))
+	}
+	folded := hashes[len(hashes)-1]
+	for i := len(hashes) - 2; i >= 0; i-- {
+		folded = nodeHash(hashes[i], folded)
+	}
+	if seal(c.Size, folded) != sealed {
+		return errors.New("the compact range does not fold to the sealed root")
+	}
+	return nil
 }
 
 // AnchorEntry is what L0 holds for one anchor transaction: the roots the batch entry lists and the canonical window of that batch. Both heights zero means the
@@ -330,27 +390,36 @@ func short(h string) string {
 //     later is a FAIL); an entry with no window leaves the height undated (SKIP). The lower bound needs the prior anchor: no prior is a SKIP by name, a prior whose
 //     consistency proof does not show its tree is a prefix of the covering one is a FAIL, as is a prior whose tree already holds the leaf, one L0 does not list, or a
 //     leaf earlier than the prior window's first height. Within both windows it is a PASS.
+//   - the version is read BEFORE the status, as the runtime's Check reads it: a version 1 document or a version this verifier does not read is a SKIP whatever its status or
+//     its checkpoint says.
+//   - an UNAVAILABLE document that carries the node's checkpoint statement is judged by checkCheckpointStatement: a statement whose compact range does not fold to the sealed root
+//     it names is a FAIL; a true one is a SKIP (it proves nothing about the bundle) that says so, with L0 confirming the seal when a reader and an anchor are given (a seal L0
+//     does not list, or an anchor it cannot read, is a FAIL).
 //
 // It changes no assurance level: an L0-proven state root is a further integrity check on what the bundle claims, and the level ladder has no state-root rung.
 func Check(ctx context.Context, d *Document, bundleRoot [32]byte, consumerID string, reader AnchorReader) Result {
 	if d == nil {
 		return Result{VerdictSkip, "no state root proof is attached to this bundle: its state root is unchecked (bundles exported before the node kept a root history carry none)"}
 	}
-	switch d.Status {
-	case StatusAwaitingAnchor:
-		return Result{VerdictSkip, fmt.Sprintf("finalized after the newest anchor: the bundle's state root is in the node's history (leaf at canonical height %d, history now %d leaves) but the newest anchored seal covers only %d, so it is unchecked until the next anchor; re-export or re-attach the proof then", d.LeafHeight, d.CurrentSize, d.NewestAnchoredSize)}
-	case StatusUnavailable:
-		return Result{VerdictSkip, "the node could not prove the bundle's state root: " + d.Reason}
-	case StatusProven:
-	default:
-		return Result{VerdictSkip, fmt.Sprintf("the attached state root proof has status %q, which this verifier does not read: the bundle's state root is unchecked", d.Status)}
-	}
+	// the version first, as the runtime's Check reads it: a document of a form this verifier does not read is never looked into, whatever its status says
 	switch d.Version {
 	case DocumentVersion:
 	case documentVersionV1:
 		return Result{VerdictSkip, "the attached state root proof is version 1, which records no consumer: it shows the root was held but not that this bundle read it, so no consumer recorded, and the bundle's state root is unchecked"}
 	default:
 		return Result{VerdictSkip, fmt.Sprintf("the attached state root proof is version %q, which this verifier does not read: the bundle's state root is unchecked", d.Version)}
+	}
+	switch d.Status {
+	case StatusAwaitingAnchor:
+		return Result{VerdictSkip, fmt.Sprintf("finalized after the newest anchor: the bundle's state root is in the node's history (leaf at canonical height %d, history now %d leaves) but the newest anchored seal covers only %d, so it is unchecked until the next anchor; re-export or re-attach the proof then", d.LeafHeight, d.CurrentSize, d.NewestAnchoredSize)}
+	case StatusUnavailable:
+		if d.Checkpoint != nil {
+			return checkCheckpointStatement(ctx, d, reader)
+		}
+		return Result{VerdictSkip, "the node could not prove the bundle's state root: " + d.Reason}
+	case StatusProven:
+	default:
+		return Result{VerdictSkip, fmt.Sprintf("the attached state root proof has status %q, which this verifier does not read: the bundle's state root is unchecked", d.Status)}
 	}
 	if d.Consumer == "" {
 		return Result{VerdictSkip, "the attached state root proof names no consumer (no consumer recorded): it cannot be bound to this bundle, so the bundle's state root is unchecked"}
@@ -448,4 +517,31 @@ func Check(ctx context.Context, d *Document, bundleRoot [32]byte, consumerID str
 		return Result{VerdictFail, fmt.Sprintf("the leaf's canonical height %d is before the first height %d of the prior anchor's window: it is not in the span the two anchors enclose", d.LeafHeight, prior.FirstHeight)}
 	}
 	return Result{VerdictPass, fmt.Sprintf("the bundle's state root is leaf %d of %d in the node's root history, recorded for this bundle, whose sealed root %s L0 lists in anchor transaction %s; the leaf at canonical height %d lies inside the span [%d, %d] that sealed root and the prior anchor %s (whose tree the covering one extends) enclose", d.LeafIndex, d.TreeSize, short(d.AccumulatorRoot), short(d.Anchor.TxHash), d.LeafHeight, prior.FirstHeight, cover.LastHeight, short(p.Anchor.TxHash))}
+}
+
+// checkCheckpointStatement judges the checkpoint an unavailable document states (ledger L1647). The statement proves nothing about the bundle (a skip at best, never a pass): what it
+// can be is FALSE, and a false one is a FAIL. Its compact range must fold to the sealed root it names (a range for another tree, or a seal for another size, is refused), and, with an
+// L0 endpoint and an anchor named, L0 must list that sealed root (a seal the node never anchored is refused). A statement that holds is a skip saying so: the bundle's root is unchecked,
+// and a proof for a bundle recorded before the checkpoint is the document that was exported with it.
+func checkCheckpointStatement(ctx context.Context, d *Document, reader AnchorReader) Result {
+	c := d.Checkpoint
+	if err := c.Verify(); err != nil {
+		return Result{VerdictFail, fmt.Sprintf("the node states it checkpointed its root history at leaf %d, and the statement is false: %v", c.Size, err)}
+	}
+	base := fmt.Sprintf("the node could not prove the bundle's state root: %s; it states its root history was checkpointed at leaf %d (canonical height %d): the checkpoint's compact range folds to sealed root %s, and the bundle's state root is unchecked", d.Reason, c.Size, c.LastHeight, short(c.SealedRoot))
+	if reader == nil {
+		return Result{VerdictSkip, base + ", but no L0 endpoint was supplied, so that the node anchored that seal is not independently confirmed"}
+	}
+	if c.Anchor == nil || c.Anchor.TxHash == "" {
+		return Result{VerdictSkip, base + ", but the statement names no L0 anchor for that seal, so it is unconfirmed"}
+	}
+	anchored, err := reader.AnchorAt(ctx, c.Anchor.TxHash)
+	if err != nil {
+		return Result{VerdictFail, "could not read the checkpoint's anchor from L0: " + err.Error()}
+	}
+	sealed, _ := decode32(c.SealedRoot)
+	if !anchored.Lists(sealed) {
+		return Result{VerdictFail, fmt.Sprintf("the checkpoint's sealed root %s is not listed in the L0 anchor entry of transaction %s: the node never anchored it", short(c.SealedRoot), short(c.Anchor.TxHash))}
+	}
+	return Result{VerdictSkip, base + ", and L0 lists that seal in anchor transaction " + short(c.Anchor.TxHash)}
 }

@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math/bits"
 	"os"
 	"strings"
 	"testing"
@@ -18,7 +20,7 @@ import (
 // new file is copied over and the pin is updated deliberately, in the same commit as whatever made this implementation agree with it.
 //
 // vectorsSHA256 is over the file with line endings normalised to LF (a Windows checkout may rewrite them).
-const vectorsSHA256 = "e1c5b1b073a3cbf8608913c1a21e33929d686330e95d9329037bdfcdf2bf4a07"
+const vectorsSHA256 = "d978b0eb62bdcfa38963fa93df00b192431766b72d7735ae3ca435eab2901ef9"
 
 const vectorsPath = "testdata/state-root-vectors.json"
 
@@ -66,12 +68,21 @@ type vectorDocCase struct {
 	DetailContains []string                `json:"detailContains"`
 }
 
+// vectorCheckpoint is the checkpoint of a tree of Size leaves (ledger L1647): the compact range (the perfect subtrees of the binary decomposition of Size, left to right) and the sealed
+// root it folds to.
+type vectorCheckpoint struct {
+	Size    uint64   `json:"size"`
+	Compact []string `json:"compact"`
+	Sealed  string   `json:"sealed"`
+}
+
 type vectorFile struct {
 	SealDomain     string              `json:"sealDomain"`
 	ConsumerDomain string              `json:"consumerDomain"`
 	Leaves         []vectorLeaf        `json:"leaves"`
 	Trees          []vectorTree        `json:"trees"`
 	Consistency    []vectorConsistency `json:"consistency"`
+	Checkpoints    []vectorCheckpoint  `json:"checkpoints"`
 	Documents      []vectorDocCase     `json:"documents"`
 }
 
@@ -414,4 +425,346 @@ func TestAConsistencyProofWithAnExtraElementIsRefusedByTheVerificationItself(t *
 	if checked == 0 {
 		t.Fatal("no consistency vector was checked")
 	}
+}
+
+// ---- the checkpoint statement (ledger L1647) ----
+//
+// An unavailable document may carry the node's statement that it checkpointed its root history. The statement proves nothing about the bundle (a skip at best, never a
+// pass); it can be FALSE, and a false one is refused. Every vector of the file's `checkpoints` section and every field of the statement is held here.
+
+func checkpointOf(c vectorCheckpoint) Checkpoint {
+	return Checkpoint{Size: c.Size, SealedRoot: c.Sealed, Compact: append([]string(nil), c.Compact...)}
+}
+
+func flipHex(t *testing.T, h string) string {
+	t.Helper()
+	b := mustDecode(t, h)
+	b[0] ^= 1
+	return hex.EncodeToString(b[:])
+}
+
+func mustRefuse(t *testing.T, what string, c Checkpoint, want string) {
+	t.Helper()
+	err := c.Verify()
+	if err == nil {
+		t.Fatalf("%s: the statement was accepted", what)
+	}
+	if want != "" && !strings.Contains(err.Error(), want) {
+		t.Fatalf("%s: refused with %q, want it to contain %q", what, err.Error(), want)
+	}
+}
+
+func TestEveryCheckpointOfTheVectorsFoldsToTheSealTheVectorsNameAndEveryTamperOfItIsRefused(t *testing.T) {
+	vf := loadVectors(t)
+	if len(vf.Checkpoints) != 40 {
+		t.Fatalf("%d checkpoints in the vectors, want one per tree size 1..40", len(vf.Checkpoints))
+	}
+	for _, c := range vf.Checkpoints {
+		if len(c.Compact) != bits.OnesCount64(c.Size) {
+			t.Fatalf("size %d: %d compact entries, want one per one bit of the size (%d)", c.Size, len(c.Compact), bits.OnesCount64(c.Size))
+		}
+		if c.Sealed != vf.Trees[c.Size-1].Sealed {
+			t.Fatalf("size %d: the checkpoint names seal %s, the tree of that size is sealed %s", c.Size, c.Sealed, vf.Trees[c.Size-1].Sealed)
+		}
+		ck := checkpointOf(c)
+		if err := ck.Verify(); err != nil {
+			t.Fatalf("size %d: %v", c.Size, err)
+		}
+		up := checkpointOf(c)
+		up.Size++
+		mustRefuse(t, fmt.Sprintf("size %d: the range for the next larger size", c.Size), up, "")
+		down := checkpointOf(c)
+		down.Size--
+		mustRefuse(t, fmt.Sprintf("size %d: the range for the next smaller size", c.Size), down, "")
+		sealed := checkpointOf(c)
+		sealed.SealedRoot = flipHex(t, c.Sealed)
+		mustRefuse(t, fmt.Sprintf("size %d: another sealed root", c.Size), sealed, "the compact range does not fold to the sealed root")
+		for i := range c.Compact {
+			flipped := checkpointOf(c)
+			flipped.Compact[i] = flipHex(t, flipped.Compact[i])
+			mustRefuse(t, fmt.Sprintf("size %d: entry %d flipped", c.Size, i), flipped, "the compact range does not fold to the sealed root")
+			dropped := checkpointOf(c)
+			dropped.Compact = append(append([]string(nil), c.Compact[:i]...), c.Compact[i+1:]...)
+			mustRefuse(t, fmt.Sprintf("size %d: entry %d dropped", c.Size, i), dropped, fmt.Sprintf("a tree of %d leaves has a compact range of %d subtrees, not %d", c.Size, len(c.Compact), len(c.Compact)-1))
+			bad := checkpointOf(c)
+			bad.Compact[i] = "not-hex"
+			mustRefuse(t, fmt.Sprintf("size %d: entry %d malformed", c.Size, i), bad, fmt.Sprintf("compact[%d]", i))
+		}
+		extra := checkpointOf(c)
+		extra.Compact = append(extra.Compact, hex.EncodeToString(bytes.Repeat([]byte{9}, 32)))
+		mustRefuse(t, fmt.Sprintf("size %d: an extra entry", c.Size), extra, fmt.Sprintf("the compact range has more entries than the %d leaves it covers have subtrees", c.Size))
+		none := checkpointOf(c)
+		none.Compact = nil
+		mustRefuse(t, fmt.Sprintf("size %d: no entries", c.Size), none, fmt.Sprintf("a tree of %d leaves has a compact range of %d subtrees, not 0", c.Size, len(c.Compact)))
+		if len(c.Compact) >= 2 && c.Compact[0] != c.Compact[1] {
+			swapped := checkpointOf(c)
+			swapped.Compact[0], swapped.Compact[1] = swapped.Compact[1], swapped.Compact[0]
+			mustRefuse(t, fmt.Sprintf("size %d: the two largest subtrees swapped", c.Size), swapped, "the compact range does not fold to the sealed root")
+		}
+	}
+	// a range with the right number of entries for ANOTHER size is not this size's: sizes 3 and 5 both have two subtrees
+	var three, five vectorCheckpoint
+	for _, c := range vf.Checkpoints {
+		switch c.Size {
+		case 3:
+			three = c
+		case 5:
+			five = c
+		}
+	}
+	mustRefuse(t, "the range of 3 offered for 5", Checkpoint{Size: 5, SealedRoot: five.Sealed, Compact: three.Compact}, "the compact range does not fold to the sealed root")
+	mustRefuse(t, "the range of 5 offered for 3", Checkpoint{Size: 3, SealedRoot: three.Sealed, Compact: five.Compact}, "the compact range does not fold to the sealed root")
+}
+
+func TestACheckpointWhoseSizeSealedRootOrEntriesAreMalformedIsRefusedByName(t *testing.T) {
+	vf := loadVectors(t)
+	var c21 vectorCheckpoint
+	for _, c := range vf.Checkpoints {
+		if c.Size == 21 {
+			c21 = c
+		}
+	}
+	good := checkpointOf(c21)
+	if err := good.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	zero := good
+	zero.Size = 0
+	mustRefuse(t, "a checkpoint that seals no leaves", zero, "the checkpoint seals no leaves")
+	for _, bad := range []string{"not-hex", "", good.SealedRoot[2:], good.SealedRoot[1:], good.SealedRoot + "00"} {
+		c := checkpointOf(c21)
+		c.SealedRoot = bad
+		mustRefuse(t, fmt.Sprintf("sealed root %q", bad), c, "sealedRoot: ")
+	}
+	c := checkpointOf(c21)
+	c.SealedRoot = good.SealedRoot[2:]
+	mustRefuse(t, "a sealed root of 31 bytes", c, "sealedRoot: 31 bytes, want 32")
+	c = checkpointOf(c21)
+	c.Compact[2] = c.Compact[2][2:]
+	mustRefuse(t, "an entry of 31 bytes", c, "compact[2]: 31 bytes, want 32")
+	c = checkpointOf(c21)
+	c.Compact[2] = c.Compact[2][1:]
+	mustRefuse(t, "an odd-length entry", c, "compact[2]: ")
+	if _, err := hex.DecodeString(c.Compact[2]); err == nil {
+		t.Fatal("premise: an odd-length entry decodes")
+	}
+}
+
+// a document whose statement cannot be read into the types the node writes it with never reaches the check: a size that is not a whole number, a negative one, a string, an overflowing one, a
+// statement that is not an object
+func TestAStatementThatDoesNotDecodeIntoTheNodesTypesIsNotADocument(t *testing.T) {
+	for _, statement := range []string{`{"size":1.5}`, `{"size":-1}`, `{"size":"21"}`, `{"size":1e30}`, `{"size":18446744073709551616}`, `{"lastHeight":-3}`, `{"compact":"abcd"}`, `{"compact":[1]}`, `{"anchor":"x"}`, `0`, `false`, `"x"`, `[]`} {
+		raw := `{"version":"infrix-state-root-proof-v2","status":"unavailable","stateRoot":"` + strings.Repeat("00", 32) + `","checkpoint":` + statement + `}`
+		var d Document
+		if err := json.Unmarshal([]byte(raw), &d); err == nil {
+			t.Errorf("a checkpoint %s decoded into a Document: %+v", statement, d.Checkpoint)
+		}
+	}
+	for _, statement := range []string{`{}`, `null`, `{"size":null}`} {
+		raw := `{"version":"infrix-state-root-proof-v2","status":"unavailable","stateRoot":"` + strings.Repeat("00", 32) + `","checkpoint":` + statement + `}`
+		var d Document
+		if err := json.Unmarshal([]byte(raw), &d); err != nil {
+			t.Errorf("a checkpoint %s did not decode: %v", statement, err)
+		}
+	}
+}
+
+func vectorCase(t *testing.T, name string) vectorDocCase {
+	t.Helper()
+	for _, c := range loadVectors(t).Documents {
+		if c.Name == name {
+			return c
+		}
+	}
+	t.Fatalf("the vectors have no case %q", name)
+	return vectorDocCase{}
+}
+
+func entriesOf(t *testing.T, anchors map[string]vectorAnchor) map[string]AnchorEntry {
+	t.Helper()
+	out := map[string]AnchorEntry{}
+	for tx, a := range anchors {
+		e := AnchorEntry{FirstHeight: a.FirstHeight, LastHeight: a.LastHeight}
+		for _, r := range a.Roots {
+			e.Roots = append(e.Roots, mustDecode(t, r))
+		}
+		out[tx] = e
+	}
+	return out
+}
+
+func readerOfCase(t *testing.T, c vectorDocCase) AnchorReader {
+	t.Helper()
+	if c.NoReader {
+		return nil
+	}
+	vr := vectorReader{anchors: entriesOf(t, c.Anchors)}
+	if c.AnchorError != "" {
+		vr.err = errors.New(c.AnchorError)
+	}
+	return vr
+}
+
+// docOf is the case's document with one thing changed, decoded the way a verifier is handed it.
+func docOf(t *testing.T, c vectorDocCase, edit func(m map[string]any)) *Document {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(c.Document, &m); err != nil {
+		t.Fatal(err)
+	}
+	edit(m)
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := &Document{}
+	if err := json.Unmarshal(b, d); err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+func ckm(m map[string]any) map[string]any { return m["checkpoint"].(map[string]any) }
+
+func confirmedCase(t *testing.T) vectorDocCase {
+	return vectorCase(t, "an unavailable proof whose checkpoint L0 confirms is a skip saying so")
+}
+
+func checkOf(t *testing.T, c vectorDocCase, d *Document, reader AnchorReader) Result {
+	t.Helper()
+	return Check(context.Background(), d, mustDecode(t, c.BundleRoot), c.ConsumerID, reader)
+}
+
+func wantResult(t *testing.T, what string, got Result, verdict Verdict, contains ...string) {
+	t.Helper()
+	if got.Verdict != verdict {
+		t.Fatalf("%s: verdict %s (%s), want %s", what, got.Verdict, got.Detail, verdict)
+	}
+	for _, w := range contains {
+		if !strings.Contains(got.Detail, w) {
+			t.Fatalf("%s: detail %q does not contain %q", what, got.Detail, w)
+		}
+	}
+}
+
+func TestADocumentThatStatesATrueCheckpointIsASkipAndNeverAPassForEveryCheckpointSizeOfTheVectors(t *testing.T) {
+	vf := loadVectors(t)
+	base := confirmedCase(t)
+	for _, c := range vf.Checkpoints {
+		doc := docOf(t, base, func(m map[string]any) {
+			k := ckm(m)
+			k["size"] = c.Size
+			k["sealedRoot"] = c.Sealed
+			compact := make([]any, len(c.Compact))
+			for i, h := range c.Compact {
+				compact[i] = h
+			}
+			k["compact"] = compact
+		})
+		l0 := vectorReader{anchors: map[string]AnchorEntry{"cc33": {Roots: [][32]byte{{1}, mustDecode(t, c.Sealed)}, FirstHeight: 150, LastHeight: 160}}}
+		wantResult(t, fmt.Sprintf("size %d confirmed", c.Size), checkOf(t, base, doc, l0), VerdictSkip, fmt.Sprintf("checkpointed at leaf %d ", c.Size), "L0 lists that seal in anchor transaction cc33")
+		wantResult(t, fmt.Sprintf("size %d offline", c.Size), checkOf(t, base, doc, nil), VerdictSkip, "no L0 endpoint was supplied")
+		unlisted := vectorReader{anchors: map[string]AnchorEntry{"cc33": {Roots: [][32]byte{{1}}}}}
+		wantResult(t, fmt.Sprintf("size %d unlisted", c.Size), checkOf(t, base, doc, unlisted), VerdictFail, "never anchored")
+	}
+}
+
+func TestEveryFieldOfACheckpointStatementIsHeldSizeSealedRootCompactLastHeightReasonAndAnchor(t *testing.T) {
+	c := confirmedCase(t)
+	reader := readerOfCase(t, c)
+	noop := func(m map[string]any) {}
+	wantResult(t, "premise", checkOf(t, c, docOf(t, c, noop), reader), VerdictSkip,
+		"L0 lists that seal in anchor transaction cc33", "no leaf is held for this bundle", "checkpointed at leaf 21 (canonical height 160)", "folds to sealed root 55fc35a95aeeccab...")
+
+	// the node's own words (last height, reason) are reported, never judged: the verdict holds and the detail carries what the document says
+	wantResult(t, "moved", checkOf(t, c, docOf(t, c, func(m map[string]any) { ckm(m)["lastHeight"] = 999; m["reason"] = "another reason" }), reader), VerdictSkip, "another reason", "canonical height 999")
+	wantResult(t, "no height", checkOf(t, c, docOf(t, c, func(m map[string]any) { delete(ckm(m), "lastHeight") }), reader), VerdictSkip, "canonical height 0)")
+	wantResult(t, "no reason", checkOf(t, c, docOf(t, c, func(m map[string]any) { delete(m, "reason") }), reader), VerdictSkip, "state root: ; it states")
+
+	// the size
+	for _, size := range []float64{22, 20, 0, 1} {
+		got := checkOf(t, c, docOf(t, c, func(m map[string]any) { ckm(m)["size"] = size }), reader)
+		wantResult(t, fmt.Sprintf("size %v", size), got, VerdictFail, fmt.Sprintf("checkpointed its root history at leaf %v, and the statement is false", size))
+	}
+	// the sealed root
+	for _, sealed := range []string{strings.Repeat("09", 32), "zz", ""} {
+		got := checkOf(t, c, docOf(t, c, func(m map[string]any) { ckm(m)["sealedRoot"] = sealed }), reader)
+		wantResult(t, fmt.Sprintf("sealedRoot %q", sealed), got, VerdictFail, "the statement is false")
+	}
+	wantResult(t, "no sealed root", checkOf(t, c, docOf(t, c, func(m map[string]any) { delete(ckm(m), "sealedRoot") }), reader), VerdictFail, "the statement is false: sealedRoot: 0 bytes, want 32")
+	// the compact range, entry by entry
+	for i := 0; i < 3; i++ {
+		flipped := checkOf(t, c, docOf(t, c, func(m map[string]any) {
+			cs := ckm(m)["compact"].([]any)
+			cs[i] = flipHex(t, cs[i].(string))
+		}), reader)
+		wantResult(t, fmt.Sprintf("compact[%d] flipped", i), flipped, VerdictFail, "the compact range does not fold to the sealed root")
+		dropped := checkOf(t, c, docOf(t, c, func(m map[string]any) {
+			cs := ckm(m)["compact"].([]any)
+			ckm(m)["compact"] = append(append([]any(nil), cs[:i]...), cs[i+1:]...)
+		}), reader)
+		wantResult(t, fmt.Sprintf("compact[%d] dropped", i), dropped, VerdictFail, "the statement is false: a tree of 21 leaves has a compact range of 3 subtrees, not 2")
+	}
+	wantResult(t, "an extra entry", checkOf(t, c, docOf(t, c, func(m map[string]any) {
+		ckm(m)["compact"] = append(ckm(m)["compact"].([]any), strings.Repeat("08", 32))
+	}), reader), VerdictFail, "more entries than the 21 leaves it covers have subtrees")
+	wantResult(t, "no range", checkOf(t, c, docOf(t, c, func(m map[string]any) { delete(ckm(m), "compact") }), reader), VerdictFail, "a compact range of 3 subtrees, not 0")
+
+	// the anchor: absent or empty is unconfirmed, a transaction L0 does not have or cannot read is refused, a seal it does not list is refused; the account is a locator only
+	for name, edit := range map[string]func(m map[string]any){
+		"absent":  func(m map[string]any) { delete(ckm(m), "anchor") },
+		"empty":   func(m map[string]any) { ckm(m)["anchor"] = map[string]any{} },
+		"no hash": func(m map[string]any) { ckm(m)["anchor"] = map[string]any{"txHash": "", "account": "acc://x"} },
+	} {
+		wantResult(t, "anchor "+name, checkOf(t, c, docOf(t, c, edit), reader), VerdictSkip, "names no L0 anchor for that seal, so it is unconfirmed")
+	}
+	wantResult(t, "an unknown transaction", checkOf(t, c, docOf(t, c, func(m map[string]any) { ckm(m)["anchor"].(map[string]any)["txHash"] = "dead" }), reader), VerdictFail,
+		"could not read the checkpoint's anchor from L0: no such transaction")
+	down := vectorReader{err: errors.New("connection refused"), anchors: entriesOf(t, c.Anchors)}
+	wantResult(t, "L0 down", checkOf(t, c, docOf(t, c, noop), down), VerdictFail, "could not read the checkpoint's anchor from L0: connection refused")
+	other := vectorReader{anchors: map[string]AnchorEntry{"cc33": {Roots: [][32]byte{{4}}, FirstHeight: 150, LastHeight: 160}}}
+	wantResult(t, "another seal", checkOf(t, c, docOf(t, c, noop), other), VerdictFail,
+		"sealed root 55fc35a95aeeccab... is not listed in the L0 anchor entry of transaction cc33: the node never anchored it")
+	wantResult(t, "another account", checkOf(t, c, docOf(t, c, func(m map[string]any) { ckm(m)["anchor"].(map[string]any)["account"] = "acc://elsewhere.acme/state" }), reader), VerdictSkip, "L0 lists that seal")
+	// the roots alone are enough to confirm a seal: an entry with no window still confirms it
+	rootsOnly := vectorReader{anchors: map[string]AnchorEntry{"cc33": {Roots: entriesOf(t, c.Anchors)["cc33"].Roots}}}
+	wantResult(t, "no window", checkOf(t, c, docOf(t, c, noop), rootsOnly), VerdictSkip, "L0 lists that seal")
+}
+
+func TestTheCheckpointIsReadOnlyFromAnUnavailableDocumentOfTheVersionThisVerifierReadsAsTheRuntimeReadsIt(t *testing.T) {
+	c := confirmedCase(t)
+	reader := readerOfCase(t, c)
+	falsified := func(edit func(m map[string]any)) *Document {
+		return docOf(t, c, func(m map[string]any) {
+			cs := ckm(m)["compact"].([]any)
+			cs[0] = flipHex(t, cs[0].(string))
+			edit(m)
+		})
+	}
+	// a version it does not read is never looked into, whatever its status or its statement says
+	wantResult(t, "v1", checkOf(t, c, falsified(func(m map[string]any) { m["version"] = documentVersionV1 }), reader), VerdictSkip, "version 1")
+	wantResult(t, "v9", checkOf(t, c, falsified(func(m map[string]any) { m["version"] = "infrix-state-root-proof-v9" }), reader), VerdictSkip, "does not read")
+	wantResult(t, "no version", checkOf(t, c, falsified(func(m map[string]any) { delete(m, "version") }), reader), VerdictSkip, "does not read")
+	// a document that is not unavailable never has its statement judged: a proven one is judged as a proof, an awaiting one as awaiting
+	wantResult(t, "awaiting", checkOf(t, c, falsified(func(m map[string]any) { m["status"] = "awaiting_anchor" }), reader), VerdictSkip, "unchecked until the next anchor")
+	wantResult(t, "bogus status", checkOf(t, c, falsified(func(m map[string]any) { m["status"] = "bogus" }), reader), VerdictSkip, "does not read")
+	p := vectorCase(t, "a proven leaf recorded in the gap of a delayed anchor passes")
+	proven := docOf(t, p, func(m map[string]any) { m["checkpoint"] = map[string]any{"size": 0} })
+	wantResult(t, "proven", checkOf(t, p, proven, readerOfCase(t, p)), VerdictPass)
+	// no statement, an explicit null one: the plain unavailable skip; an empty one is judged and false
+	plain := "the node could not prove the bundle's state root: no leaf is held for this bundle"
+	for name, edit := range map[string]func(m map[string]any){
+		"absent": func(m map[string]any) { delete(m, "checkpoint") },
+		"null":   func(m map[string]any) { m["checkpoint"] = nil },
+	} {
+		got := checkOf(t, c, docOf(t, c, edit), reader)
+		wantResult(t, "statement "+name, got, VerdictSkip, plain)
+		if got.Detail != plain {
+			t.Fatalf("statement %s: detail %q, want exactly %q", name, got.Detail, plain)
+		}
+	}
+	wantResult(t, "an empty statement", checkOf(t, c, docOf(t, c, func(m map[string]any) { m["checkpoint"] = map[string]any{} }), reader), VerdictFail, "the statement is false: the checkpoint seals no leaves")
+	// the bundle's own root and consumer are not read for a statement: it proves nothing about the bundle
+	got := Check(context.Background(), docOf(t, c, func(m map[string]any) {}), [32]byte{}, "", reader)
+	wantResult(t, "an anonymous bundle", got, VerdictSkip, "L0 lists that seal")
 }

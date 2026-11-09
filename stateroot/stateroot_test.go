@@ -806,7 +806,7 @@ func TestAVectorFileThatCarriesACarriageReturnIsRefusedNamingGitattributes(t *te
 		if err == nil {
 			t.Fatalf("%s: a file that carries a carriage return was accepted", name)
 		}
-		for _, want := range []string{".gitattributes", "stateroot/testdata/*.json text eol=lf", "carriage return"} {
+		for _, want := range []string{"carriage return", "any file .gitattributes does not pin", "pin it in .gitattributes with `stateroot/testdata/*.json text eol=lf` and check the file out again"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Fatalf("%s: the refusal %q does not name %q", name, err.Error(), want)
 			}

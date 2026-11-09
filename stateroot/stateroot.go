@@ -150,7 +150,7 @@ func (c *Checkpoint) Verify() error {
 	if err != nil {
 		return fmt.Errorf("sealedRoot: %w", err)
 	}
-	hashes := make([][32]byte, 0, len(c.Compact))
+	var hashes [][32]byte
 	rest := c.Size
 	for i, s := range c.Compact {
 		if rest == 0 {

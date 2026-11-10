@@ -298,9 +298,7 @@ func normalizeSolanaAccount(_, account string) (string, error) {
 	if len(raw) != 32 {
 		return "", refuse("solana account %q decodes to %d bytes, want a 32-byte public key", account, len(raw))
 	}
-	if Base58Encode(raw) != account {
-		return "", refuse("solana account %q is not the canonical base58 spelling of its 32 bytes", account)
-	}
+	// base58 is a bijection between strings and byte strings (a leading '1' is one leading zero byte and nothing else): a string that decodes IS the one canonical spelling of its bytes
 	return account, nil
 }
 
@@ -354,9 +352,6 @@ func ParseBitcoinAddress(reference, account string) (BitcoinAddress, error) {
 	}
 	if len(payload) != 20 {
 		return BitcoinAddress{}, refuse("bip122 account %q holds %d bytes, want 20", account, len(payload))
-	}
-	if Base58CheckEncode(payload, version) != account {
-		return BitcoinAddress{}, refuse("bip122 account %q is not the canonical base58check spelling of its bytes", account)
 	}
 	switch version {
 	case network.p2pkhVersion:

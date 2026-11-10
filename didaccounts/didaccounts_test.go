@@ -273,3 +273,159 @@ func TestTheSolanaStandardRefusesWhatTheShapeCheckAdmits(t *testing.T) {
 		}
 	}
 }
+
+// THE BOUNDARIES (part 25f2, row D3): the planted cuts of this package found what the vectors do not reach, exactly as the cuts of core's chain_accounts.go did: the edges of the human-readable part's
+// byte range and length, the string length and the reason it gives, the regrouping width, the refusals the shape check in front of a normalizer shadows, and the reason each refusal gives.
+
+func TestTheHumanReadablePartIsHeldToItsByteRangeAndLengthAtTheirEdges(t *testing.T) {
+	for _, ok := range []string{"!", "~", "!~", "a", strings.Repeat("a", 83), "?"} {
+		if err := bech32CheckHRP(ok); err != nil {
+			t.Errorf("the human-readable part %q (every byte in 33..126, 1 to 83 characters) was refused: %v", ok, err)
+		}
+	}
+	for name, bad := range map[string]string{"empty": "", "84 characters": strings.Repeat("a", 84), "a space (32)": "a b", "DEL (127)": "a\x7fb", "a byte above 127": "a\x80b", "a control byte": "\x01"} {
+		if err := bech32CheckHRP(bad); !errors.Is(err, ErrInvalidAccount) {
+			t.Errorf("%s: %q: %v", name, bad, err)
+		}
+	}
+	for _, hrp := range []string{"!", "~", strings.Repeat("a", 83)} {
+		s, err := Bech32Encode(hrp, []byte{1, 2}, Bech32)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, _, _, err := Bech32Decode(s, Bech32MaxLength); err != nil || got != hrp {
+			t.Errorf("%q: decoded to %q (%v)", hrp, got, err)
+		}
+	}
+	if _, err := Bech32Encode("UPPER", nil, Bech32); err == nil || !strings.Contains(err.Error(), "lower-case") {
+		t.Errorf("an upper-case human-readable part was encoded: %v", err)
+	}
+}
+
+func TestTheEncoderRefusesAValueThatIsNotAFiveBitGroupAndAcceptsTheLargestThatIs(t *testing.T) {
+	if _, err := Bech32Encode("x", []byte{32}, Bech32); err == nil || !strings.Contains(err.Error(), "5-bit group") {
+		t.Errorf("a value of 32: %v", err)
+	}
+	s, err := Bech32Encode("x", []byte{31, 0}, Bech32)
+	if err != nil {
+		t.Fatalf("a value of 31: %v", err)
+	}
+	if _, data, _, err := Bech32Decode(s, Bech32MaxLength); err != nil || !bytes.Equal(data, []byte{31, 0}) {
+		t.Errorf("31 and 0 decode to %v (%v)", data, err)
+	}
+}
+
+func TestTheStringLengthIsHeldToItsBoundsAndSaysSo(t *testing.T) {
+	message := "characters, want 8 to"
+	if _, _, _, err := Bech32Decode("abcdefg", 90); err == nil || !strings.Contains(err.Error(), message) {
+		t.Errorf("a seven-character string: %v, want the length refusal", err)
+	}
+	if _, _, _, err := Bech32Decode("a12uel5l", 90); err != nil {
+		t.Errorf("the eight-character minimum: %v", err)
+	}
+	data := make([]byte, 100)
+	for i := range data {
+		data[i] = byte(i % 32)
+	}
+	long, err := Bech32Encode("x", data, Bech32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := Bech32Decode(long, len(long)); err != nil {
+		t.Errorf("a string of exactly the maximum length: %v", err)
+	}
+	if _, _, _, err := Bech32Decode(long, len(long)-1); err == nil || !strings.Contains(err.Error(), message) {
+		t.Errorf("a string one character over the maximum: %v, want the length refusal", err)
+	}
+	if _, _, _, err := Bech32Decode(long, Bech32MaxLength); err != nil {
+		t.Errorf("the same string under the codec's own maximum: %v", err)
+	}
+}
+
+func TestTheBitRegroupingNamesAValueThatDoesNotFitAndPadsExactlyWhenBitsRemain(t *testing.T) {
+	if _, err := ConvertBits([]byte{32, 0, 0, 0, 0, 0, 0, 0}, 5, 8, false); err == nil || !strings.Contains(err.Error(), "does not fit its source group width") {
+		t.Errorf("a 5-bit group of 32: %v", err)
+	}
+	if _, err := ConvertBits([]byte{31, 0, 0, 0, 0, 0, 0, 0}, 5, 8, false); err != nil {
+		t.Errorf("a 5-bit group of 31: %v", err)
+	}
+	// five bytes are eight groups exactly: padding adds none; one byte is one group and three bits: padding adds a second
+	if got, err := ConvertBits([]byte{1, 2, 3, 4, 5}, 8, 5, true); err != nil || len(got) != 8 {
+		t.Errorf("five bytes with padding: %v %v", got, err)
+	}
+	if got, err := ConvertBits([]byte{1}, 8, 5, true); err != nil || len(got) != 2 {
+		t.Errorf("one byte with padding: %v %v", got, err)
+	}
+}
+
+func TestTheBase58CheckDecoderHoldsItsMinimumLengthAndItsChecksum(t *testing.T) {
+	// a version byte and an empty payload are the shortest base58check string, and its checksum decides
+	version, payload, ok := Base58CheckDecode(Base58CheckEncode(nil, 7))
+	if !ok || version != 7 || len(payload) != 0 {
+		t.Errorf("the shortest base58check string: %d %x %v", version, payload, ok)
+	}
+	// four bytes that are exactly the checksum of an empty body are NOT a base58check string (too short for a version byte)
+	if _, _, ok := Base58CheckDecode(Base58Encode(doubleSHA256(nil))); ok {
+		t.Error("a string of only a checksum was read as base58check")
+	}
+	if _, _, ok := Base58CheckDecode("0OIl"); ok {
+		t.Error("characters outside the alphabet were read as base58check")
+	}
+}
+
+func TestTheCosmosNormalizerRefusesEachThingForItsOwnReason(t *testing.T) {
+	raw := make([]byte, 20)
+	for i := range raw {
+		raw[i] = byte(i*7 + 3)
+	}
+	data, err := ConvertBits(raw, 8, 5, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	good, _ := Bech32Encode("cosmos", data, Bech32)
+	if _, err := normalizeCosmosAccount("cosmoshub-4", strings.ToUpper(good)); err == nil || !strings.Contains(err.Error(), "lower case only") {
+		t.Errorf("an upper-case address reaches the normalizer and is refused for its case: %v", err)
+	}
+	if _, err := normalizeCosmosAccount("cosmoshub-4", good[:len(good)-1]+"q"); err == nil || !strings.Contains(err.Error(), "checksum does not verify") {
+		t.Errorf("a bad checksum is refused for the checksum: %v", err)
+	}
+	padded, _ := Bech32Encode("cosmos", append(append([]byte(nil), data...), 0, 1), Bech32)
+	if _, err := normalizeCosmosAccount("cosmoshub-4", padded); err == nil || !strings.Contains(err.Error(), "padding") {
+		t.Errorf("an address with non-zero padding: %v", err)
+	}
+	for _, size := range []int{19, 21, 31, 33} {
+		d, _ := ConvertBits(make([]byte, size), 8, 5, true)
+		s, _ := Bech32Encode("cosmos", d, Bech32)
+		if _, err := normalizeCosmosAccount("cosmoshub-4", s); err == nil || !strings.Contains(err.Error(), "holds") {
+			t.Errorf("a payload of %d bytes: %v", size, err)
+		}
+	}
+}
+
+func TestEveryBitcoinRefusalGivesItsOwnReason(t *testing.T) {
+	const mainnet = "000000000019d6689c085ae165831e93"
+	reason := func(reference, account, contains string) {
+		t.Helper()
+		if _, err := ParseBitcoinAddress(reference, account); err == nil || !errors.Is(err, ErrInvalidAccount) || !strings.Contains(err.Error(), contains) {
+			t.Errorf("%s: %v, want a refusal containing %q", account, err, contains)
+		}
+	}
+	reason(mainnet, "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNb", "neither")
+	for _, size := range []int{19, 21} {
+		reason(mainnet, Base58CheckEncode(make([]byte, size), 0x00), "holds")
+	}
+	reason(mainnet, "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5", "checksum does not verify")
+	foreign, _ := Bech32Encode("bc1x", []byte{0, 1, 2, 3}, Bech32)
+	reason(mainnet, foreign, "human-readable part")
+	reason(mainnet, "bc1gmk9yu", "carries no witness version")
+	versionOnly, _ := Bech32Encode("bc", []byte{0}, Bech32)
+	reason(mainnet, versionOnly, "0-byte program")
+	pad := append([]byte{0}, make([]byte, 33)...)
+	pad[len(pad)-1] = 1
+	padded, _ := Bech32Encode("bc", pad, Bech32)
+	reason(mainnet, padded, "padding")
+	reason(mainnet, "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kemeawh", "version 0 is bech32")
+	reason(mainnet, "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqh2y7hd", "bech32m")
+	reason("000000000933ea01ad0ee984209779ba", "tb1z0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqglt7rf", "bech32m")
+	reason(mainnet, "bc1zw508d6qejxtdg4y5r3zarvaryvaxxpcs", "only P2WPKH")
+}

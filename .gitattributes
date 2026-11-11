@@ -2,3 +2,6 @@
 credverify/testdata/did-vectors-v1.json -text
 credverify/contexts/** -text
 credverify/testdata/** -text
+# The shared state root vectors are pinned by SHA-256 over their LF bytes (stateroot_test.go refuses a file that carries a carriage return, naming this line):
+# core.autocrlf=true on a Windows checkout would rewrite them and fail the pin.
+stateroot/testdata/*.json text eol=lf

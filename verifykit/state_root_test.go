@@ -40,6 +40,12 @@ type provenCase struct {
 
 func provenCaseFromVectors(t *testing.T) provenCase {
 	t.Helper()
+	return caseFromVectors(t, "a proven leaf recorded in the gap of a delayed anchor passes", "pass")
+}
+
+// caseFromVectors is the shared vectors' document case of that name (which must carry that verdict), with the bundle root, consumer id and L0 it is judged against.
+func caseFromVectors(t *testing.T, name, verdict string) provenCase {
+	t.Helper()
 	raw, err := os.ReadFile("../stateroot/testdata/state-root-vectors.json")
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +68,7 @@ func provenCaseFromVectors(t *testing.T) provenCase {
 		t.Fatal(err)
 	}
 	for _, c := range vf.Documents {
-		if c.Name != "a proven leaf recorded in the gap of a delayed anchor passes" || c.Verdict != "pass" {
+		if c.Name != name || c.Verdict != verdict {
 			continue
 		}
 		pc := provenCase{doc: &stateroot.Document{}, outcomeID: c.ConsumerID, l0: fakeAnchors{entries: map[string]stateroot.AnchorEntry{}}}
@@ -89,7 +95,7 @@ func provenCaseFromVectors(t *testing.T) provenCase {
 		}
 		return pc
 	}
-	t.Fatal("the vectors have no passing delayed-anchor case")
+	t.Fatalf("the vectors have no case %q with verdict %s", name, verdict)
 	return provenCase{}
 }
 
@@ -246,5 +252,77 @@ func TestADocumentThatDidNotDecodeFailsTheBundle(t *testing.T) {
 	r := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer(), StateRootProofError: "the stateRootProof attached to the bundle does not decode"})
 	if c := stateRootCheck(t, r); c.Status != CheckFail || r.Verified {
 		t.Fatalf("a malformed document: %+v verified=%v", c, r.Verified)
+	}
+}
+
+// THE CHECKPOINT STATEMENT reaches the verdict through Verify: a node that checkpointed its root history answers a bundle recorded before the checkpoint with an unavailable
+// document that carries the statement. A false statement fails the bundle; a true one is a skip (it proves nothing about the bundle), leaves every level and verdict where
+// they were, and a verifier that requires a proven root refuses it.
+func flippedCheckpoint(t *testing.T, d *stateroot.Document) *stateroot.Document {
+	t.Helper()
+	c := *d
+	ck := *d.Checkpoint
+	ck.Compact = append([]string(nil), d.Checkpoint.Compact...)
+	b, err := hex.DecodeString(ck.Compact[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	b[0] ^= 1
+	ck.Compact[0] = hex.EncodeToString(b)
+	c.Checkpoint = &ck
+	return &c
+}
+
+func TestAFalseCheckpointStatementMakesTheBundleNotVerifiedAndATrueOneLeavesItUnchecked(t *testing.T) {
+	pc := caseFromVectors(t, "an unavailable proof whose checkpoint L0 confirms is a skip saying so", "skip")
+	if pc.doc.Status != stateroot.StatusUnavailable || pc.doc.Checkpoint == nil {
+		t.Fatalf("premise: the case is not an unavailable document that states a checkpoint: %+v", pc.doc)
+	}
+	pkg := buildPortableFor(t, true, pc.root, pc.outcomeID)
+	base := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer()})
+
+	r := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer(), StateRootProof: pc.doc, StateRootAnchors: pc.l0})
+	if c := stateRootCheck(t, r); c.Status != CheckSkip || !strings.Contains(c.Detail, "L0 lists that seal in anchor transaction cc33") || !r.Verified {
+		t.Fatalf("a true statement L0 confirms: %+v verified=%v", c, r.Verified)
+	}
+	sameVerdict(t, base, r) // no level moved, and nothing that verified stopped verifying
+
+	off := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer(), StateRootProof: pc.doc})
+	if c := stateRootCheck(t, off); c.Status != CheckSkip || !strings.Contains(c.Detail, "no L0 endpoint was supplied") || !off.Verified {
+		t.Fatalf("a true statement with no endpoint: %+v verified=%v", c, off.Verified)
+	}
+
+	bad := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer(), StateRootProof: flippedCheckpoint(t, pc.doc), StateRootAnchors: pc.l0})
+	if c := stateRootCheck(t, bad); c.Status != CheckFail || !strings.Contains(c.Detail, "the statement is false") || bad.Verified || bad.CryptographicallyVerified || bad.FullyVerified {
+		t.Fatalf("a false statement: %+v verified=%v crypto=%v full=%v", c, bad.Verified, bad.CryptographicallyVerified, bad.FullyVerified)
+	}
+	badOffline := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer(), StateRootProof: flippedCheckpoint(t, pc.doc)})
+	if c := stateRootCheck(t, badOffline); c.Status != CheckFail || badOffline.Verified {
+		t.Fatalf("a false statement needs no endpoint to be refused: %+v verified=%v", c, badOffline.Verified)
+	}
+
+	unlisted := fakeAnchors{entries: map[string]stateroot.AnchorEntry{}}
+	for tx, e := range pc.l0.entries {
+		unlisted.entries[tx] = stateroot.AnchorEntry{Roots: [][32]byte{{1}, {2}}, FirstHeight: e.FirstHeight, LastHeight: e.LastHeight}
+	}
+	never := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer(), StateRootProof: pc.doc, StateRootAnchors: unlisted})
+	if c := stateRootCheck(t, never); c.Status != CheckFail || !strings.Contains(c.Detail, "never anchored") || never.Verified {
+		t.Fatalf("a seal L0 never listed: %+v verified=%v", c, never.Verified)
+	}
+	down := Verify(context.Background(), pkg, Options{L0Confirmer: okConfirmer(), StateRootProof: pc.doc, StateRootAnchors: fakeAnchors{err: errors.New("connection refused")}})
+	if c := stateRootCheck(t, down); c.Status != CheckFail || !strings.Contains(c.Detail, "could not read the checkpoint's anchor from L0") || down.Verified {
+		t.Fatalf("an unreadable anchor: %+v verified=%v", c, down.Verified)
+	}
+
+	// a verifier that requires a proven root refuses a true statement too: it proves nothing about the bundle
+	for name, opts := range map[string]Options{
+		"confirmed": {StateRootProof: pc.doc, StateRootAnchors: pc.l0},
+		"offline":   {StateRootProof: pc.doc},
+	} {
+		opts.L0Confirmer, opts.RequireStateRootProof = okConfirmer(), true
+		req := Verify(context.Background(), pkg, opts)
+		if c := stateRootCheck(t, req); c.Status != CheckFail || !strings.Contains(c.Detail, "a proven state root is required") || req.Verified {
+			t.Fatalf("%s, required: %+v verified=%v", name, c, req.Verified)
+		}
 	}
 }

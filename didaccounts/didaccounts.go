@@ -64,7 +64,9 @@ func Base58Encode(raw []byte) string {
 	value := new(big.Int).SetBytes(raw)
 	fiftyEight, mod := big.NewInt(58), new(big.Int)
 	var digits []byte
-	for value.Sign() > 0 {
+	// value is never negative (SetBytes), so "not zero" is the loop's whole condition: written as != 0, a cut of it cannot turn the loop into
+	// one that never ends (the `> 0` spelling's `>= 0` cut hung the table of part 25f5 instead of being judged)
+	for value.Sign() != 0 {
 		value.DivMod(value, fiftyEight, mod)
 		digits = append(digits, base58Alphabet[mod.Int64()])
 	}

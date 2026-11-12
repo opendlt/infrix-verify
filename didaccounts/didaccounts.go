@@ -59,26 +59,28 @@ func Base58Decode(text string) []byte {
 	return append(make([]byte, zeros), value.Bytes()...)
 }
 
+// bigIntDigits are the digits big.Int.Text writes for bases up to 62, in order: the i-th is the digit of value i.
+const bigIntDigits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 // Base58Encode is the base58 spelling of bytes (each leading zero byte is a leading '1').
 func Base58Encode(raw []byte) string {
+	// The digits are big.Int's own base-58 text, spelled in the base58 alphabet: no division loop whose condition a cut could turn into one
+	// that never ends (the table of part 25f5 hung twice on such cuts instead of judging them).
 	value := new(big.Int).SetBytes(raw)
-	fiftyEight, mod := big.NewInt(58), new(big.Int)
-	var digits []byte
-	// value is never negative (SetBytes), so "not zero" is the loop's whole condition: written as != 0, a cut of it cannot turn the loop into
-	// one that never ends (the `> 0` spelling's `>= 0` cut hung the table of part 25f5 instead of being judged)
-	for value.Sign() != 0 {
-		value.DivMod(value, fiftyEight, mod)
-		digits = append(digits, base58Alphabet[mod.Int64()])
+	body := ""
+	if value.Sign() != 0 {
+		text := value.Text(58)
+		spelled := make([]byte, len(text))
+		for i := 0; i < len(text); i++ {
+			spelled[i] = base58Alphabet[strings.IndexByte(bigIntDigits, text[i])]
+		}
+		body = string(spelled)
 	}
 	zeros := 0
 	for zeros < len(raw) && raw[zeros] == 0 {
 		zeros++
 	}
-	out := strings.Repeat("1", zeros)
-	for i := len(digits) - 1; i >= 0; i-- {
-		out += string(digits[i])
-	}
-	return out
+	return strings.Repeat("1", zeros) + body
 }
 
 func doubleSHA256(data []byte) []byte {

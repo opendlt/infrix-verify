@@ -21,7 +21,8 @@
 // bytes), the hash the next entry names as its predecessor.
 //
 // THE CHAIN: the first entry is a genesis (version "1", sequence 1, no predecessor, no operation, not deactivated); every later entry names the exact storage hash of the entry before
-// it, has the next sequence and version, carries at least one operation, a lifecycle operation (deactivate, reactivate) alone, no change of a deactivated subject but a reactivation, no
+// it, has the next sequence and version, carries at least one operation, deactivate alone and reactivate first (lifecycle.go: a reactivation proves the commitment of the
+// deactivation it undoes), no change of a deactivated subject but a reactivation, no
 // reactivation of an active one, and the deactivated state its operations yield. THE AUTHORITY: an anon statement is an Ed25519 signature of the digest by an authentication key
 // (Multikey) of the PREVIOUS document (the genesis by its own); a chain statement is the DID's foreign account's signature of the statement message in its chain's standard.
 //
@@ -41,6 +42,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/opendlt/infrix-verify/didaccounts"
 )
@@ -77,9 +79,11 @@ type Entry struct {
 	Operations                            []Operation
 	DocumentHash, StorageHash             []byte
 	Deactivated                           bool
-	Document                              json.RawMessage
-	Scheme                                string
-	Signer, Signature                     []byte
+	// Created and Updated are the times the entry's metadata states (held to the ledger's when the history carries its ledger times: lifecycle.go)
+	Created, Updated  time.Time
+	Document          json.RawMessage
+	Scheme            string
+	Signer, Signature []byte
 }
 
 func lp(h interface{ Write([]byte) (int, error) }, b []byte) {
@@ -141,7 +145,6 @@ func DocumentHash(document []byte) ([]byte, error) {
 	sum := sha256.Sum256(canonical)
 	return sum[:], nil
 }
-
 
 func entryRefuse(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrEntry, fmt.Sprintf(format, args...))
@@ -234,6 +237,12 @@ func DecodeEntry(raw []byte) (*Entry, error) {
 		if err := json.Unmarshal(value, &e.Deactivated); err != nil {
 			return nil, entryRefuse("metadata.deactivated is not a boolean")
 		}
+	}
+	if e.Created, err = decodeTime(metadata["created"], "metadata.created"); err != nil {
+		return nil, err
+	}
+	if e.Updated, err = decodeTime(metadata["updated"], "metadata.updated"); err != nil {
+		return nil, err
 	}
 	identity, err := strictObject(top["identity"], "the identity binding", "canonicalDid", "accountUrl", "networkId", "aliases")
 	if err != nil {
@@ -372,25 +381,20 @@ func verifyShape(i int, e, previous *Entry) error {
 	if len(e.Operations) == 0 {
 		return chainRefusal(i, "an update carries no operation")
 	}
-	deactivates, reactivates := 0, 0
-	for _, op := range e.Operations {
-		switch op.Type {
-		case OperationDeactivate:
-			deactivates++
-		case OperationReactivate:
-			reactivates++
-		}
+	deactivates, reactivates, err := checkPlacement(i, e.Operations)
+	if err != nil {
+		return err
 	}
-	if deactivates+reactivates > 0 && len(e.Operations) != 1 {
-		return chainRefusal(i, "a lifecycle operation is its own statement")
-	}
-	if previous.Deactivated && reactivates == 0 {
+	if previous.Deactivated && !reactivates {
 		return chainRefusal(i, "the subject is deactivated and only a reactivation changes it")
 	}
-	if reactivates > 0 && !previous.Deactivated {
+	if reactivates && !previous.Deactivated {
 		return chainRefusal(i, "a reactivation of a subject that is active")
 	}
-	want := (previous.Deactivated || deactivates > 0) && reactivates == 0
+	if err := verifyLifecycle(i, e, previous, deactivates, reactivates); err != nil {
+		return err
+	}
+	want := (previous.Deactivated || deactivates) && !reactivates
 	if e.Deactivated != want {
 		return chainRefusal(i, "the entry says deactivated=%t and its operations yield deactivated=%t", e.Deactivated, want)
 	}
@@ -413,6 +417,16 @@ func (AnonAuthorizer) Authorize(previous, next *Entry, digest [32]byte) error {
 	}
 	if len(next.Signer) != ed25519.PublicKeySize || len(next.Signature) != ed25519.SignatureSize {
 		return fmt.Errorf("the signer is %d bytes and the signature %d, want 32 and 64 (Ed25519)", len(next.Signer), len(next.Signature))
+	}
+	// the recovery: a reactivation of a committed deactivation is signed by its committed key (verifyShape held it to the commitment), which need not be listed in the deactivated document
+	if previous != nil && previous.Deactivated {
+		if recovery := recoveryKey(next); !bytes.Equal(recovery, next.Signer) {
+			return fmt.Errorf("the reactivation of version %s is signed by %x, and only its committed recovery key %x signs it", previous.VersionID, next.Signer, recovery)
+		}
+		if !ed25519.Verify(next.Signer, digest[:], next.Signature) {
+			return errors.New("the signature does not verify over the statement digest")
+		}
+		return nil
 	}
 	keys, err := authenticationKeys(authority.Document)
 	if err != nil {
@@ -477,6 +491,8 @@ type AnonHistory struct {
 	DID      string   `json:"did"`
 	Registry string   `json:"registry"`
 	Entries  []string `json:"entries"`
+	// LedgerTimes, when present, are the ledger's record of when each entry landed (lifecycle.go)
+	LedgerTimes []string `json:"ledgerTimes,omitempty"`
 }
 
 // AnonVerdict is what a verified anon history proves (core's AnonHistoryVerdict, member for member).
@@ -490,6 +506,8 @@ type AnonVerdict struct {
 	TailDeactivated bool     `json:"tailDeactivated"`
 	TailStorageHash string   `json:"tailStorageHash"`
 	Signers         []string `json:"signers"`
+	TimesProven     bool     `json:"timesProven"`
+	TailLedgerTime  string   `json:"tailLedgerTime,omitempty"`
 }
 
 // ParseAnonDID reads did:infrix:v1:anon:<network id>:<subject>, the subject 64 lower-case hexadecimal characters, the network id "g1-" and 64 lower-case hexadecimal characters.
@@ -550,6 +568,10 @@ func VerifyAnonHistory(h *AnonHistory) (*AnonVerdict, error) {
 		}
 		network, account, authorizer = anonNetwork, h.Registry+"/did-anon-"+subject, AnonAuthorizer{}
 	}
+	ledger, err := parseLedgerTimes(h.LedgerTimes, len(h.Entries))
+	if err != nil {
+		return nil, err
+	}
 	history := make([]*Entry, len(h.Entries))
 	for i, encoded := range h.Entries {
 		raw, err := base64.StdEncoding.DecodeString(encoded)
@@ -574,9 +596,17 @@ func VerifyAnonHistory(h *AnonHistory) (*AnonVerdict, error) {
 	if err := verifyDerivation(history); err != nil {
 		return nil, err
 	}
+	if ledger != nil {
+		if err := verifyTimes(history, ledger); err != nil {
+			return nil, err
+		}
+	}
 	tail := history[len(history)-1]
 	verdict := &AnonVerdict{Verified: true, DID: h.DID, NetworkID: network, Account: account, Entries: len(history), TailVersionID: tail.VersionID, TailDeactivated: tail.Deactivated,
-		TailStorageHash: hex.EncodeToString(tail.StorageHash)}
+		TailStorageHash: hex.EncodeToString(tail.StorageHash), TimesProven: ledger != nil}
+	if ledger != nil {
+		verdict.TailLedgerTime = ledger[len(ledger)-1].Format(time.RFC3339)
+	}
 	seen := map[string]bool{}
 	for _, e := range history {
 		if signer := hex.EncodeToString(e.Signer); !seen[signer] {

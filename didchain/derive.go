@@ -292,8 +292,8 @@ var operationMembers = map[string]map[string]string{
 	"removeAlsoKnownAs":        {"identifier": "string"},
 	"addRelationship":          {"relationship": "string", "verificationMethodId": "string"},
 	"removeRelationship":       {"relationship": "string", "verificationMethodId": "string"},
-	"deactivate":               {},
-	"reactivate":               {},
+	"deactivate":               {"reactivationCommitment": "string"},
+	"reactivate":               {"reactivationKey": "string", "reactivationProof": "string"},
 }
 
 // DeriveDocument applies stored operations, in order, to a document's JSON and returns the document they yield. An operation that does not apply is refused (ErrDerivation).

@@ -480,7 +480,8 @@ func applyOperation(doc map[string]any, op Operation) error {
 		if index < 0 {
 			return deriveRefuse("%s not found: %s", map[string]string{"verificationMethod": "verification method", "service": "service"}[listName], id)
 		}
-		setObjects(doc, listName, items)
+		// the items are the document's own objects (objects returns them, not copies), so each update above is in the document already (part 25i: a setObjects here
+		// rewrote the same objects and no cut could tell it was there)
 	case "addService":
 		svc, err := modelForm(m["service"], serviceMembers, "service")
 		if err != nil {

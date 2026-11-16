@@ -25,8 +25,8 @@
 // reactivation of an active one, and the deactivated state its operations yield. THE AUTHORITY: an anon statement is an Ed25519 signature of the digest by an authentication key
 // (Multikey) of the PREVIOUS document (the genesis by its own); a chain statement is the DID's foreign account's signature of the statement message in its chain's standard.
 //
-// WHAT THIS PACKAGE DOES NOT CHECK, AND CORE DOES: that each document is what its statement's typed operations yield from the document before (core's resolver applies the operations);
-// a history this package accepts is authentic (each version signed by its authority, chained, hashed as stored) but its documents are not re-derived from the operations here.
+// THE DOCUMENTS: every later version's document is re-derived from the document before it by applying its statement's operations (derive.go), and its canonical hash must be the
+// hash the entry binds, so an authentic chain over a document the operations do not yield is refused. derive.go states the one thing core checks beyond this (the document rules).
 package didchain
 
 import (
@@ -548,6 +548,9 @@ func VerifyAnonHistory(h *AnonHistory) (*AnonVerdict, error) {
 		history[i] = entry
 	}
 	if err := Verify(h.DID, network, history, AnonAuthorizer{}); err != nil {
+		return nil, err
+	}
+	if err := verifyDerivation(history); err != nil {
 		return nil, err
 	}
 	tail := history[len(history)-1]

@@ -230,3 +230,72 @@ func TestEveryTamperOfTheValidAnonHistoryIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryDocumentDerivationVectorIsReproduced applies each case's stored operations to the base document and reaches core's outcome: the canonical document and its hash, or the
+// refusal; and the two anon histories whose chain is authentic but whose document is not what the operations yield (underived, misordered) are refused by the derivation.
+func TestEveryDocumentDerivationVectorIsReproduced(t *testing.T) {
+	raw, err := os.ReadFile("../credverify/testdata/did-vectors-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		DocumentDerivation struct {
+			Base  json.RawMessage `json:"base"`
+			Cases []struct {
+				Name       string            `json:"name"`
+				Operations []json.RawMessage `json:"operations"`
+				Valid      bool              `json:"valid"`
+				Document   string            `json:"document"`
+				SHA256     string            `json:"sha256"`
+			} `json:"cases"`
+		} `json:"documentDerivation"`
+	}
+	if err := json.Unmarshal(raw, &file); err != nil || len(file.DocumentDerivation.Cases) == 0 {
+		t.Fatalf("no document-derivation vectors (%v)", err)
+	}
+	valid, refused := 0, 0
+	for _, c := range file.DocumentDerivation.Cases {
+		var ops []Operation
+		for _, opRaw := range c.Operations {
+			var object map[string]json.RawMessage
+			if err := json.Unmarshal(opRaw, &object); err != nil {
+				t.Fatal(err)
+			}
+			var name string
+			_ = json.Unmarshal(object["type"], &name)
+			ops = append(ops, Operation{Type: name, Object: object})
+		}
+		derived, err := DeriveDocument(file.DocumentDerivation.Base, ops)
+		if !c.Valid {
+			if !errors.Is(err, ErrDerivation) {
+				t.Errorf("%s: must be refused, got %v", c.Name, err)
+			}
+			refused++
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s: refused: %v", c.Name, err)
+			continue
+		}
+		text, _ := json.Marshal(derived)
+		canonical, err := CanonicalizeJSON(text)
+		if err != nil || string(canonical) != c.Document {
+			t.Errorf("%s:\n got %s (%v)\nwant %s", c.Name, canonical, err, c.Document)
+		}
+		if hash, _ := DerivedDocumentHash(derived); hex.EncodeToString(hash) != c.SHA256 {
+			t.Errorf("%s: hash %x, want %s", c.Name, hash, c.SHA256)
+		}
+		valid++
+	}
+	if valid == 0 || refused == 0 {
+		t.Fatalf("%d valid and %d refused derivation cases", valid, refused)
+	}
+	for _, v := range loadVectors(t).AnonHistory {
+		if strings.HasSuffix(v.Name, "underived") || strings.HasSuffix(v.Name, "misordered") {
+			history := v.History
+			if _, err := VerifyAnonHistory(&history); !errors.Is(err, ErrDerivation) && !(strings.HasSuffix(v.Name, "misordered") && errors.Is(err, ErrStatementChain) && strings.Contains(err.Error(), "do not apply")) {
+				t.Errorf("%s: %v, want the derivation's refusal", v.Name, err)
+			}
+		}
+	}
+}

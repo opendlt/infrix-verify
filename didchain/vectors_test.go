@@ -299,3 +299,43 @@ func TestEveryDocumentDerivationVectorIsReproduced(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryChainHistoryVectorReachesItsVerdict: core's chain-history vectors (an eip155 account's history and its tampered twins) reach their verdicts here, the valid one member for
+// member.
+func TestEveryChainHistoryVectorReachesItsVerdict(t *testing.T) {
+	raw, err := os.ReadFile("../credverify/testdata/did-vectors-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		ChainHistory []struct {
+			Name    string       `json:"name"`
+			Valid   bool         `json:"valid"`
+			Refusal string       `json:"refusal"`
+			Verdict *AnonVerdict `json:"verdict"`
+			History AnonHistory  `json:"history"`
+		} `json:"chainHistory"`
+	}
+	if err := json.Unmarshal(raw, &file); err != nil || len(file.ChainHistory) == 0 {
+		t.Fatalf("no chain-history vectors (%v)", err)
+	}
+	classes := map[string]error{"statement-chain-refused": ErrStatementChain, "anon-history-refused": ErrEntry}
+	valid, refused := 0, 0
+	for _, v := range file.ChainHistory {
+		history := v.History
+		verdict, err := VerifyAnonHistory(&history)
+		switch {
+		case v.Valid && (err != nil || !reflect.DeepEqual(verdict, v.Verdict)):
+			t.Errorf("%s: %+v %v, want %+v", v.Name, verdict, err, v.Verdict)
+		case v.Valid:
+			valid++
+		case classes[v.Refusal] == nil || !errors.Is(err, classes[v.Refusal]):
+			t.Errorf("%s: %v, want %s", v.Name, err, v.Refusal)
+		default:
+			refused++
+		}
+	}
+	if valid != 1 || refused == 0 {
+		t.Fatalf("%d valid and %d refused chain histories", valid, refused)
+	}
+}

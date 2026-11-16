@@ -517,21 +517,42 @@ func isLowerHex(s string, n int) bool {
 	return true
 }
 
-// VerifyAnonHistory verifies an anon history as core's VerifyAnonHistoryFile does, but for the one check this package does not make (the documents re-derived from the operations):
-// every entry decodes as a registry entry of the DID bound to its account <registry>/did-anon-<subject>, and the entries are a chain of statements authorized by the previous document's
-// keys.
+// VerifyAnonHistory verifies a registry history of an anon or a chain DID as core's VerifyAnonHistoryFile does: every entry decodes as a registry entry of the DID bound to its account
+// (<registry>/did-anon-<subject>, or <registry>/did-chain-<digest of the account>), the entries are a chain of statements authorized by the profile's authority (the previous document's
+// keys, or the foreign account), and every document is the one its operations yield.
 func VerifyAnonHistory(h *AnonHistory) (*AnonVerdict, error) {
 	if h == nil || len(h.Entries) == 0 {
 		return nil, entryRefuse("the history holds no entries")
 	}
-	network, subject, err := ParseAnonDID(h.DID)
-	if err != nil {
-		return nil, err
-	}
 	if !strings.HasPrefix(h.Registry, "acc://") || strings.Contains(strings.TrimPrefix(h.Registry, "acc://"), "/") || len(h.Registry) == len("acc://") {
 		return nil, entryRefuse("registry %q is not an Accumulate identity URL", h.Registry)
 	}
-	account := h.Registry + "/did-anon-" + subject
+	var network, account string
+	var authorizer Authorizer
+	if chain, err := ParseChainDID(h.DID); err == nil {
+		// a chain DID names no network: the history is held to the network its first entry's identity binding names, and every entry to that one; its account is
+		// <registry>/did-chain-<hex SHA-256("infrix:did-chain-registry:v1|" namespace "|" reference "|" account)>
+		raw, err := base64.StdEncoding.DecodeString(h.Entries[0])
+		if err != nil {
+			return nil, entryRefuse("entry 0 is not base64: %v", err)
+		}
+		var first struct {
+			Identity struct {
+				NetworkID string `json:"networkId"`
+			} `json:"identity"`
+		}
+		if err := json.Unmarshal(raw, &first); err != nil || !strings.HasPrefix(first.Identity.NetworkID, "g1-") || !isLowerHex(strings.TrimPrefix(first.Identity.NetworkID, "g1-"), 64) {
+			return nil, entryRefuse("entry 0 names no network id")
+		}
+		digest := sha256.Sum256([]byte("infrix:did-chain-registry:v1|" + chain.Namespace + "|" + chain.Reference + "|" + chain.Account))
+		network, account, authorizer = first.Identity.NetworkID, h.Registry+"/did-chain-"+hex.EncodeToString(digest[:]), ChainAuthorizer{}
+	} else {
+		anonNetwork, subject, err := ParseAnonDID(h.DID)
+		if err != nil {
+			return nil, err
+		}
+		network, account, authorizer = anonNetwork, h.Registry+"/did-anon-"+subject, AnonAuthorizer{}
+	}
 	history := make([]*Entry, len(h.Entries))
 	for i, encoded := range h.Entries {
 		raw, err := base64.StdEncoding.DecodeString(encoded)
@@ -547,7 +568,7 @@ func VerifyAnonHistory(h *AnonHistory) (*AnonVerdict, error) {
 		}
 		history[i] = entry
 	}
-	if err := Verify(h.DID, network, history, AnonAuthorizer{}); err != nil {
+	if err := Verify(h.DID, network, history, authorizer); err != nil {
 		return nil, err
 	}
 	if err := verifyDerivation(history); err != nil {

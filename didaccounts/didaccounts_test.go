@@ -21,7 +21,7 @@ import (
 // `infrix did vectors --out` in infrix core); this package is held to its `bech32` and `chainAccounts` sections, to its `parse` and `construct` vectors of the chain profile, and to the
 // standards' own published examples.
 
-const pinnedDIDVectorsSHA256 = "14e6bb157b510c214987cfb734f3295433fcf5ab40ef253593564a89009fea97"
+const pinnedDIDVectorsSHA256 = "4ac7326a683ca07dfe272e452e8e37320d00c4fc3c46f159a84ad20be6021c24"
 
 type vectorSet struct {
 	Spec      string `json:"spec"`

@@ -221,6 +221,11 @@ func TestAnAnonDIDAndAHistoryAreReadOnlyInTheirCanonicalForm(t *testing.T) {
 		"a chain entry of no base64": {&AnonHistory{DID: "did:infrix:v1:chain:eip155:1:0x52908400098527886e0f7030069857d2e4169ee7", Registry: ok.Registry, Entries: []string{"%%%"}}, "entry 0 is not base64"},
 		"a chain entry of no network": {&AnonHistory{DID: "did:infrix:v1:chain:eip155:1:0x52908400098527886e0f7030069857d2e4169ee7", Registry: ok.Registry,
 			Entries: []string{base64.StdEncoding.EncodeToString([]byte(`{"identity":{}}`))}}, "entry 0 names no network id"},
+		"a chain entry whose network lacks its prefix": {&AnonHistory{DID: "did:infrix:v1:chain:eip155:1:0x52908400098527886e0f7030069857d2e4169ee7", Registry: ok.Registry,
+			Entries: []string{base64.StdEncoding.EncodeToString([]byte(`{"identity":{"networkId":"` + hex64 + `"}}`))}}, "entry 0 names no network id"},
+		"an entry bound to another network only": {&AnonHistory{DID: ok.DID, Registry: ok.Registry, Entries: []string{base64.StdEncoding.EncodeToString(cutEntry(t, 0, func(e map[string]any) {
+			e["identity"].(map[string]any)["networkId"] = "g1-" + strings.Repeat("cd", 32)
+		}))}}, "entry 0 is bound to"},
 	} {
 		if _, err := VerifyAnonHistory(c.h); err == nil || !strings.Contains(err.Error(), c.words) {
 			t.Errorf("%s: want %q, got %v", name, c.words, err)

@@ -207,26 +207,29 @@ func TestEveryRefusalOfAStoredBindingIsHeldByItsOwnWords(t *testing.T) {
 		edit  func(map[string]any)
 		words string
 	}{
-		"a binding of another alias":   {strings.Replace(cutBinding(t, good, nil), `"identifier":"`+foreign, `"identifier":"did:key:zOther`, 1), nil, "the binding names"},
-		"a fifteen-character nonce":    {cutBinding(t, good[:15], nil), nil, "nonce is shorter than 16 characters"},
-		"a signer that is no base64":   {cutBinding(t, good, func(b map[string]any) { b["foreignSigner"] = "%%%" }), nil, "is not base64"},
-		"a proof that is no base64":    {cutBinding(t, good, func(b map[string]any) { b["foreignProofValue"] = "%%%" }), nil, "is not base64"},
-		"a foreign key of another id":  {cutBinding(t, good, func(b map[string]any) { b["foreignKeyId"] = foreign + "#k" }), nil, "the foreign key is not the did:key's own key"},
-		"a forged foreign proof":       {cutBinding(t, good, func(b map[string]any) { b["foreignProofValue"] = base64.StdEncoding.EncodeToString(make([]byte, 64)) }), nil, "the foreign controller's signature does not verify"},
-		"a forged Infrix proof":        {cutBinding(t, good, func(b map[string]any) { b["infrixProofValue"] = base64.StdEncoding.EncodeToString(make([]byte, 64)) }), nil, "the Infrix controller's signature does not verify"},
-		"an Infrix proof of no base64": {cutBinding(t, good, func(b map[string]any) { b["infrixProofValue"] = "%%%" }), nil, "the Infrix controller's signature does not verify"},
+		"a binding of another alias":               {strings.Replace(cutBinding(t, good, nil), `"identifier":"`+foreign, `"identifier":"did:key:zOther`, 1), nil, "the binding names"},
+		"a fifteen-character nonce":                {cutBinding(t, good[:15], nil), nil, "nonce is shorter than 16 characters"},
+		"a signer that is no base64":               {cutBinding(t, good, func(b map[string]any) { b["foreignSigner"] = "%%%" }), nil, "is not base64"},
+		"a proof that is no base64":                {cutBinding(t, good, func(b map[string]any) { b["foreignProofValue"] = "%%%" }), nil, "is not base64"},
+		"a foreign key of another id":              {cutBinding(t, good, func(b map[string]any) { b["foreignKeyId"] = foreign + "#k" }), nil, "the foreign key is not the did:key's own key"},
+		"a forged foreign proof":                   {cutBinding(t, good, func(b map[string]any) { b["foreignProofValue"] = base64.StdEncoding.EncodeToString(make([]byte, 64)) }), nil, "the foreign controller's signature does not verify"},
+		"a forged Infrix proof":                    {cutBinding(t, good, func(b map[string]any) { b["infrixProofValue"] = base64.StdEncoding.EncodeToString(make([]byte, 64)) }), nil, "the Infrix controller's signature does not verify"},
+		"an Infrix proof of no base64":             {cutBinding(t, good, func(b map[string]any) { b["infrixProofValue"] = "%%%" }), nil, "the Infrix controller's signature does not verify"},
 		"an Infrix key that does not authenticate": {cutBinding(t, good, nil), func(d map[string]any) { d["authentication"] = cutBaseDID + "#other" }, "the Infrix controller's signature does not verify"},
 		"an Infrix key of no Multikey": {cutBinding(t, good, nil), func(d map[string]any) {
-			d["verificationMethod"].([]any)[0].(map[string]any)["publicKeyMultibase"] = "u" + strings.TrimPrefix(mb, "z")
+			_, _, imb := cutKey("infrix-key") // the Infrix key itself, spelled in another base: only the base refuses it
+			d["verificationMethod"].([]any)[0].(map[string]any)["publicKeyMultibase"] = "u" + strings.TrimPrefix(imb, "z")
 		}, "the Infrix controller's signature does not verify"},
 		"an Infrix key of another codec": {cutBinding(t, good, nil), func(d map[string]any) {
 			pub, _, _ := cutKey("infrix-key")
 			d["verificationMethod"].([]any)[0].(map[string]any)["publicKeyMultibase"] = "z" + didaccounts.Base58Encode(append([]byte{0xec, 0x01}, pub...))
 		}, "the Infrix controller's signature does not verify"},
 		"a did:key spelled in another base": {strings.ReplaceAll(cutBinding(t, good, nil), foreign, "did:key:x"+strings.TrimPrefix(mb, "z")), nil, "is not an Ed25519 Multikey"},
-		"a did:key of another codec": {strings.ReplaceAll(cutBinding(t, good, nil), foreign, "did:key:z"+didaccounts.Base58Encode(append([]byte{0xec, 0x01}, make([]byte, 32)...))), nil, "is not an Ed25519 Multikey"},
-		"a did:pkh of four parts":    {cutBinding(t, good, func(b map[string]any) { b["foreignDid"] = "did:pkh:eip155:1:0x52908400098527886e0f7030069857d2e4169ee7:x" }), nil, "is not namespace:reference:account (CAIP-10)"},
-		"a did:pkh of no account":    {cutBinding(t, good, func(b map[string]any) { b["foreignDid"] = "did:pkh:eip155:1:0x12" }), nil, "does not name an account of a supported namespace"},
+		"a did:key of another codec":        {strings.ReplaceAll(cutBinding(t, good, nil), foreign, "did:key:z"+didaccounts.Base58Encode(append([]byte{0xec, 0x01}, make([]byte, 32)...))), nil, "is not an Ed25519 Multikey"},
+		"a did:pkh of four parts": {cutBinding(t, good, func(b map[string]any) {
+			b["foreignDid"] = "did:pkh:eip155:1:0x52908400098527886e0f7030069857d2e4169ee7:x"
+		}), nil, "is not namespace:reference:account (CAIP-10)"},
+		"a did:pkh of no account": {cutBinding(t, good, func(b map[string]any) { b["foreignDid"] = "did:pkh:eip155:1:0x12" }), nil, "does not name an account of a supported namespace"},
 	} {
 		if err := apply(c.op, c.edit); !errors.Is(err, ErrDerivation) || !strings.Contains(err.Error(), c.words) {
 			t.Errorf("%s: want a refusal saying %q, got %v", name, c.words, err)
@@ -239,5 +242,24 @@ func TestAHistoryWhoseOperationsDoNotApplyIsRefusedForThatReason(t *testing.T) {
 	err := verifyDerivation(history)
 	if !errors.Is(err, ErrStatementChain) || !strings.Contains(err.Error(), "the statement's operations do not apply to version 1") {
 		t.Fatalf("want the refusal of operations that do not apply, got %v", err)
+	}
+}
+
+func TestTheInfrixKeyOfAStoredBindingIsTheMethodItNames(t *testing.T) {
+	// two Ed25519 methods; the binding names the second, which authenticates and signed it: the first is not read for it
+	_, ipriv2, mb2 := cutKey("infrix-key-2")
+	edit := func(d map[string]any) {
+		d["verificationMethod"] = append(d["verificationMethod"].([]any), map[string]any{"id": cutBaseDID + "#k2", "type": "Multikey", "controller": cutBaseDID, "publicKeyMultibase": mb2})
+		d["authentication"] = []any{cutBaseDID + "#k1", cutBaseDID + "#k2"}
+	}
+	nonce := strings.Repeat("n", 16)
+	_, _, fmb := cutKey("foreign-key")
+	statement := []byte("infrix-alias-binding/v1\n" + cutBaseDID + "\ndid:key:" + fmb + "\n" + nonce)
+	op := cutBinding(t, nonce, func(b map[string]any) {
+		b["infrixKeyId"] = cutBaseDID + "#k2"
+		b["infrixProofValue"] = base64.StdEncoding.EncodeToString(ed25519.Sign(ipriv2, statement))
+	})
+	if _, err := DeriveDocument(cutBase(t, edit), []Operation{cutOp(t, op)}); err != nil {
+		t.Fatalf("a binding the second method signed: %v", err)
 	}
 }

@@ -7,6 +7,7 @@
 package didchain
 
 import (
+	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
@@ -53,6 +54,17 @@ func TestEveryRefusalOfTheDocumentRulesIsHeldByItsOwnWords(t *testing.T) {
 			delete(vm0(d), "publicKeyMultibase")
 			vm0(d)["type"] = "EcdsaSecp256k1VerificationKey2019"
 		}, "carries no publicKeyJwk"},
+		"a secp256k1 key whose y is 31 bytes": {func(d map[string]any) {
+			delete(vm0(d), "publicKeyMultibase")
+			vm0(d)["type"] = "EcdsaSecp256k1VerificationKey2019"
+			x := cut32(secpG.x)
+			vm0(d)["publicKeyJwk"] = map[string]any{"kty": "EC", "crv": "secp256k1", "x": base64.RawURLEncoding.EncodeToString(x), "y": base64.RawURLEncoding.EncodeToString(cut32(secpG.y)[1:])}
+		}, "x and y must be 32-byte base64url values"},
+		"a secp256k1 key whose x is 31 bytes": {func(d map[string]any) {
+			delete(vm0(d), "publicKeyMultibase")
+			vm0(d)["type"] = "EcdsaSecp256k1VerificationKey2019"
+			vm0(d)["publicKeyJwk"] = map[string]any{"kty": "EC", "crv": "secp256k1", "x": base64.RawURLEncoding.EncodeToString(cut32(secpG.x)[1:]), "y": base64.RawURLEncoding.EncodeToString(cut32(secpG.y))}
+		}, "x and y must be 32-byte base64url values"},
 		"a DIDComm endpoint object of no uri": {func(d map[string]any) {
 			svc0(d)["type"] = "DIDCommMessaging"
 			svc0(d)["serviceEndpoint"] = map[string]any{"accept": []any{"x"}}

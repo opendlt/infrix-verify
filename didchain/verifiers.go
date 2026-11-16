@@ -225,8 +225,9 @@ func base32Groups(data []byte) []byte {
 	out := make([]byte, (len(data)*8+4)/5)
 	for i := range out {
 		for b := 0; b < 5; b++ {
+			out[i] <<= 1
 			if bit := i*5 + b; bit < len(data)*8 && data[bit/8]&(0x80>>(bit%8)) != 0 {
-				out[i] |= 0x10 >> b
+				out[i] |= 1
 			}
 		}
 	}

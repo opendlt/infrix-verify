@@ -82,3 +82,6 @@ func keccak256(data []byte) [32]byte {
 	}
 	return out
 }
+
+// Keccak256 is the legacy Keccak-256 of Ethereum over data: the hash of EIP-55's checksum and of EIP-191's personal message, and the address of a key (its last 20 bytes).
+func Keccak256(data []byte) [32]byte { return keccak256(data) }

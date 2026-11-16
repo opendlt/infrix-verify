@@ -1707,6 +1707,118 @@
         "sha256": "6c4cb22d8c1c84850c659b359bcb748644f0731fd70053b5074b47481b5d37f9"
       },
       {
+        "name": "a cross-method alias in its stored form: a did:key and the binding its key signed",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignKeyId": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B#z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignProofValue": "KZYY2t3Il5vjdZytNgXJ76nzUtpP8bCqMRr971cCCLnpM+KR5ssJe7SMRlkfqMlgqn4Uw0SkR43ASU7KLSCaAw==",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\",\"did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "cce43901294c19593dcbb9590b4c9d0421f595b63d00cbb7c91e64c6396dd2e6"
+      },
+      {
+        "name": "a cross-method binding with the foreign signature missing",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignKeyId": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B#z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignProofValue": null,
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a cross-method binding made for another DID",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignKeyId": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B#z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignProofValue": "nfC7vunDeeXM22c5m804axnh7sMwpAqnWvYqBMpv2yzGZ0RvtcWps8+5N/XyxG0Qt/Md0jnoPAIMucjgvoNlCw==",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a cross-method binding replayed under another DID's name",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignKeyId": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B#z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignProofValue": "KZYY2t3Il5vjdZytNgXJ76nzUtpP8bCqMRr971cCCLnpM+KR5ssJe7SMRlkfqMlgqn4Uw0SkR43ASU7KLSCaAw==",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a cross-method binding with a short nonce",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignKeyId": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B#z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignProofValue": "LP/dWMOxSXJ0mhg0YIMKOyXevu2uJDfHgWVoTSg8sR2CTMMFvxstMnQ2tEjfq09fA+MpZ//rNd3kNSgD6CQ0DQ==",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "short"
+            },
+            "identifier": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:web alias (its keys are served by its host)",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:web:alice.example",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:web:alice.example",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
         "name": "remove the only alias (the list is omitted)",
         "operations": [
           {
@@ -1917,7 +2029,7 @@
         "valid": false
       },
       {
-        "name": "a cross-method alias no statement can carry (its proof is not stored)",
+        "name": "a cross-method alias with no binding",
         "operations": [
           {
             "identifier": "did:web:alice.example",

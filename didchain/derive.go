@@ -8,12 +8,16 @@ package didchain
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/opendlt/infrix-verify/didaccounts"
 )
 
 // THE DOCUMENT DERIVATION (infrix core part 25g, row H3: core's DIDUpdater.applyOperations and the operations of pkg/did/update.go, rule for rule). A statement chain proves who signed
@@ -565,7 +569,10 @@ func applyOperation(doc map[string]any, op Operation) error {
 			}
 			if rest, isDID := strings.CutPrefix(identifier, "did:"); isDID {
 				if method, _, _ := strings.Cut(rest, ":"); method != "infrix" && method != "lattica" {
-					return deriveRefuse("%q is a DID of another method: its binding proof is not part of a stored statement", identifier)
+					binding, _ := m["binding"].(map[string]any)
+					if err := verifyStoredBinding(binding, identifier, doc); err != nil {
+						return err
+					}
 				}
 			}
 			setList(doc, "alsoKnownAs", append(aliases, identifier), false)
@@ -646,4 +653,72 @@ func verifyDerivation(history []*Entry) error {
 		}
 	}
 	return nil
+}
+
+// verifyStoredBinding verifies a cross-method alias binding from the stored statement alone (core's VerifyStoredAliasBinding, rule for rule): the binding names the alias and the
+// document's own DID, its nonce is at least 16 characters, the alias is a did:key whose identifier is an Ed25519 Multikey, the foreign key id is <did>#<identifier>, and
+// foreignProofValue is that key's Ed25519 signature of the binding statement ("infrix-alias-binding/v1", infrixDid, foreignDid and nonce on four lines); an infrixProofValue, when present, verifies under the
+// document's authentication key infrixKeyId. A did:web or did:pkh alias (or any other method) is refused by name.
+func verifyStoredBinding(binding map[string]any, identifier string, doc map[string]any) error {
+	if binding == nil {
+		return deriveRefuse("%q is a DID of another method and needs a verified binding", identifier)
+	}
+	str := func(name string) string { s, _ := binding[name].(string); return s }
+	foreign, infrix, nonce := str("foreignDid"), str("infrixDid"), str("nonce")
+	if foreign != identifier {
+		return deriveRefuse("the binding names %q, not the alias %q", foreign, identifier)
+	}
+	if id, _ := doc["id"].(string); infrix != id {
+		return deriveRefuse("the binding names the Infrix DID %q, not the document's", infrix)
+	}
+	if len(nonce) < 16 {
+		return deriveRefuse("the binding's nonce is shorter than 16 characters")
+	}
+	multikey, isKey := strings.CutPrefix(foreign, "did:key:")
+	if !isKey {
+		return deriveRefuse("%q: a stored binding verifies only a did:key, whose identifier is its key", foreign)
+	}
+	raw := []byte(nil)
+	if strings.HasPrefix(multikey, "z") {
+		raw = didaccounts.Base58Decode(multikey[1:])
+	}
+	if len(raw) != 34 || raw[0] != 0xed || raw[1] != 0x01 {
+		return deriveRefuse("the did:key %q is not an Ed25519 Multikey", foreign)
+	}
+	if str("foreignKeyId") != foreign+"#"+multikey {
+		return deriveRefuse("the foreign key is not the did:key's own key")
+	}
+	statement := []byte("infrix-alias-binding/v1\n" + infrix + "\n" + foreign + "\n" + nonce)
+	signature, err := base64.StdEncoding.DecodeString(str("foreignProofValue"))
+	if err != nil || len(signature) != ed25519.SignatureSize || !ed25519.Verify(raw[2:], statement, signature) {
+		return deriveRefuse("the foreign controller's signature does not verify")
+	}
+	if text := str("infrixProofValue"); text != "" {
+		infrixSignature, err := base64.StdEncoding.DecodeString(text)
+		keys, kerr := authenticationKeysOf(doc, str("infrixKeyId"))
+		if err != nil || kerr != nil || !ed25519.Verify(keys, statement, infrixSignature) {
+			return deriveRefuse("the Infrix controller's signature does not verify")
+		}
+	}
+	return nil
+}
+
+// authenticationKeysOf is the Ed25519 Multikey of the authentication method keyID of a document.
+func authenticationKeysOf(doc map[string]any, keyID string) (ed25519.PublicKey, error) {
+	refs, err := list(doc, "authentication")
+	if err != nil || !contains(refs, keyID) {
+		return nil, deriveRefuse("the Infrix key %q is not an authentication method of the document", keyID)
+	}
+	methods, _ := objects(doc, "verificationMethod")
+	for _, vm := range methods {
+		if vm["id"] == keyID {
+			mb, _ := vm["publicKeyMultibase"].(string)
+			if strings.HasPrefix(mb, "z") {
+				if raw := didaccounts.Base58Decode(mb[1:]); len(raw) == 34 && raw[0] == 0xed && raw[1] == 0x01 {
+					return ed25519.PublicKey(raw[2:]), nil
+				}
+			}
+		}
+	}
+	return nil, deriveRefuse("the Infrix key %q has no Ed25519 Multikey in the document", keyID)
 }

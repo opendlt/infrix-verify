@@ -30,7 +30,7 @@ import (
 // refuses an identifier (as a parser-bearing resolver refuses a legacy, mutable or non-canonical DID)
 // turns the credential and the presentation into a NOT VERIFIED verdict.
 
-const pinnedDIDVectorsSHA256 = "4ac7326a683ca07dfe272e452e8e37320d00c4fc3c46f159a84ad20be6021c24"
+const pinnedDIDVectorsSHA256 = "e2a75a7108443661e083b9628462549e6b103034711e1bc4ab58a9d80630507e"
 
 type didVectorSet struct {
 	Spec  string `json:"spec"`

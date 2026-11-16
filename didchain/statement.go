@@ -571,6 +571,9 @@ func VerifyAnonHistory(h *AnonHistory) (*AnonVerdict, error) {
 	if err := Verify(h.DID, network, history, authorizer); err != nil {
 		return nil, err
 	}
+	if err := verifyDocuments(history); err != nil {
+		return nil, err
+	}
 	if err := verifyDerivation(history); err != nil {
 		return nil, err
 	}

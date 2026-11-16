@@ -38,8 +38,7 @@ import (
 //   - an operation of another type, a member an operation does not define, a member of the wrong kind, an update member an operation does not apply, and an empty required member are
 //     refused.
 //
-// What core checks beyond this and this package does not: the document rules of ContractDIDDocument.Validate (the canonical DID syntax of ids and controllers, the vocabulary rules)
-// and the size limits, on the genesis and on every derived version. A history core accepts is accepted here; a history core refuses for those rules alone is not refused here.
+// Every version's document is also held to the document rules (validate.go: the model, its form, Validate and the limits), as core holds it.
 
 // ErrDerivation is a statement whose operations do not apply, or whose document is not what they yield.
 var ErrDerivation = errors.New("the document is not what the statement's operations yield")
@@ -197,6 +196,12 @@ var jwkMembers = map[string]memberKind{"kty": kindRequiredString, "crv": kindStr
 
 // modelForm is an object in its model's form: each member of its kind, an empty optional member omitted (a required string is kept even when empty, as the model writes it).
 func modelForm(raw any, members map[string]memberKind, what string) (map[string]any, error) {
+	return modelFormOf(raw, members, what, true)
+}
+
+// modelFormOf is modelForm; strict reads an integer member only as an integer literal (as the model decodes JSON), and not strict as a double that is an integer (as an update value is
+// read).
+func modelFormOf(raw any, members map[string]memberKind, what string, strict bool) (map[string]any, error) {
 	object, ok := raw.(map[string]any)
 	if !ok {
 		return nil, deriveRefuse("%s is not an object", what)
@@ -224,6 +229,9 @@ func modelForm(raw any, members map[string]memberKind, what string) (map[string]
 			if kind == kindSigned {
 				min, max, text = minSigned, maxSigned, signedText
 			}
+			if n, ok := value.(json.Number); ok && strict && strings.ContainsAny(string(n), ".eE") {
+				return nil, deriveRefuse("%s.%s is not an integer literal: %s", what, name, n)
+			}
 			f, err := integral(value, what+"."+name, min, max)
 			if err != nil {
 				return nil, err
@@ -245,7 +253,7 @@ func modelForm(raw any, members map[string]memberKind, what string) (map[string]
 				out[name] = items
 			}
 		case kindJWK:
-			jwk, err := modelForm(value, jwkMembers, what+"."+name)
+			jwk, err := modelFormOf(value, jwkMembers, what+"."+name, strict)
 			if err != nil {
 				return nil, err
 			}
@@ -450,7 +458,7 @@ func applyOperation(doc map[string]any, op Operation) error {
 			if name == "serviceEndpoint" && value == nil {
 				continue // a null endpoint changes nothing
 			}
-			single, err := modelForm(map[string]any{name: value}, members, "updates")
+			single, err := modelFormOf(map[string]any{name: value}, members, "updates", false)
 			if err != nil {
 				return err
 			}

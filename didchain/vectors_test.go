@@ -339,3 +339,30 @@ func TestEveryChainHistoryVectorReachesItsVerdict(t *testing.T) {
 		t.Fatalf("%d valid and %d refused chain histories", valid, refused)
 	}
 }
+
+// TestEveryDocumentValidityVectorReachesItsVerdict: each document of core's documentValidity section is admitted or refused by the document rules exactly as core does.
+func TestEveryDocumentValidityVectorReachesItsVerdict(t *testing.T) {
+	raw, err := os.ReadFile("../credverify/testdata/did-vectors-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		DocumentValidity []struct {
+			Name     string          `json:"name"`
+			Document json.RawMessage `json:"document"`
+			Valid    bool            `json:"valid"`
+		} `json:"documentValidity"`
+	}
+	if err := json.Unmarshal(raw, &file); err != nil || len(file.DocumentValidity) == 0 {
+		t.Fatalf("no document-validity vectors (%v)", err)
+	}
+	for _, v := range file.DocumentValidity {
+		err := CheckDocument(v.Document)
+		if (err == nil) != v.Valid {
+			t.Errorf("%s: %v, want valid=%t", v.Name, err, v.Valid)
+		}
+		if err != nil && !errors.Is(err, ErrDocument) {
+			t.Errorf("%s: refused outside the document class: %v", v.Name, err)
+		}
+	}
+}

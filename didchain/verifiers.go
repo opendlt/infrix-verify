@@ -201,7 +201,12 @@ func BitcoinMessageHash(message []byte) []byte {
 
 // writeVarString writes Bitcoin's CompactSize of len(b) and b.
 func writeVarString(buf *bytes.Buffer, b []byte) {
-	n := uint64(len(b))
+	writeCompactSize(buf, uint64(len(b)))
+	buf.Write(b)
+}
+
+// writeCompactSize writes Bitcoin's CompactSize of n: one byte below 0xfd, else a marker and n in 2, 4 or 8 little-endian bytes.
+func writeCompactSize(buf *bytes.Buffer, n uint64) {
 	switch {
 	case n < 0xfd:
 		buf.WriteByte(byte(n))
@@ -212,7 +217,20 @@ func writeVarString(buf *bytes.Buffer, b []byte) {
 	default:
 		buf.Write([]byte{0xff, byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24), byte(n >> 32), byte(n >> 40), byte(n >> 48), byte(n >> 56)})
 	}
-	buf.Write(b)
+}
+
+// base32Groups regroups bytes into the 5-bit groups of a bech32 data part, the last group zero-padded: group i holds bits 5i to 5i+4, most significant first (core's
+// pkg/did base32Groups; an encoder's regrouping cannot fail, and a padding flag is not a choice it has).
+func base32Groups(data []byte) []byte {
+	out := make([]byte, (len(data)*8+4)/5)
+	for i := range out {
+		for b := 0; b < 5; b++ {
+			if bit := i*5 + b; bit < len(data)*8 && data[bit/8]&(0x80>>(bit%8)) != 0 {
+				out[i] |= 0x10 >> b
+			}
+		}
+	}
+	return out
 }
 
 func (bip122Verifier) Verify(account ChainAccount, message, signer, signature []byte) error {
@@ -296,7 +314,7 @@ func (cosmosVerifier) Verify(account ChainAccount, message, signer, signature []
 	if err != nil {
 		return chainRefuse("the signer is not a secp256k1 public key: %v", err)
 	}
-	program, _ := didaccounts.ConvertBits(Hash160(signer), 8, 5, true)
+	program := base32Groups(Hash160(signer))
 	if got, err := didaccounts.Bech32Encode(hrp, program, didaccounts.Bech32); err != nil || got != account.Account {
 		return chainRefuse("the signer's address under %q is %s, the DID names %s", hrp, got, account.Account)
 	}

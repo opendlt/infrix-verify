@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"regexp"
 	"sort"
 	"strconv"
@@ -202,8 +201,11 @@ func writeCanonical(out *bytes.Buffer, v any) error {
 func lessUTF16(a, b string) bool {
 	ua, ub := utf16.Encode([]rune(a)), utf16.Encode([]rune(b))
 	for i := 0; i < len(ua) && i < len(ub); i++ {
-		if ua[i] != ub[i] {
-			return ua[i] < ub[i]
+		switch {
+		case ua[i] < ub[i]:
+			return true
+		case ua[i] > ub[i]:
+			return false
 		}
 	}
 	return len(ua) < len(ub)
@@ -240,9 +242,6 @@ func writeCanonicalString(out *bytes.Buffer, s string) {
 // jsonNumber is the number grammar of RFC 8259 section 6.
 var jsonNumber = regexp.MustCompile(`^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$`)
 
-// maxExactInteger is 2^53: every integer of at most this magnitude is exactly a double, and its canonical spelling is its digits.
-var maxExactInteger = new(big.Int).Lsh(big.NewInt(1), 53)
-
 // CanonicalNumber writes a JSON number's text in the RFC 8785 form: the number is read as the nearest double, as the RFC reads it, and refused (ErrNotIJSON) when it is beyond the range
 // of a double, or when it is an INTEGER LITERAL (no fraction, no exponent) of magnitude above 2^53 that is not written exactly as the form writes its double (jcs.go's rule above).
 func CanonicalNumber(text string) (string, error) {
@@ -250,16 +249,16 @@ func CanonicalNumber(text string) (string, error) {
 		return "", fmt.Errorf("%w: %q is not a JSON number", ErrNotJSON, text)
 	}
 	f, err := strconv.ParseFloat(text, 64)
-	if err != nil || math.IsInf(f, 0) || math.IsNaN(f) {
+	if err != nil {
+		// the grammar above admits only finite decimal text, so ParseFloat refuses exactly a number beyond the range of a double (ErrRange) and never reads a NaN
 		return "", fmt.Errorf("%w: the number %s is beyond the range of a double", ErrNumberRange, text)
 	}
 	canonical := FormatECMAScriptNumber(f)
-	if !strings.ContainsAny(text, ".eE") {
-		// the text is a JSON integer literal (jsonNumber, no fraction and no exponent): decimal digits with an optional minus, which SetString always reads
-		exact, _ := new(big.Int).SetString(text, 10)
-		if new(big.Int).Abs(exact).Cmp(maxExactInteger) > 0 && text != canonical {
-			return "", fmt.Errorf("%w: the integer %s is above 2^53 and is not the canonical spelling of its double (%s): two documents that differ in it would share a digest", ErrInexactInteger, text, canonical)
-		}
+	// an integer literal whose text is not its double's spelling is refused. Every integer of magnitude up to 2^53 is exactly a double and is spelled by its digits, so the only
+	// such literals are the integers above 2^53 that their double does not spell, and "-0" (the same number as 0, spelled "0"), which is read (part 25i: the magnitude test this
+	// replaces could not be told apart at 2^53 itself, where text and spelling always agree)
+	if !strings.ContainsAny(text, ".eE") && text != canonical && text != "-0" {
+		return "", fmt.Errorf("%w: the integer %s is above 2^53 and is not the canonical spelling of its double (%s): two documents that differ in it would share a digest", ErrInexactInteger, text, canonical)
 	}
 	return canonical, nil
 }
@@ -270,7 +269,7 @@ func FormatECMAScriptNumber(f float64) string {
 		return "0"
 	}
 	sign := ""
-	if f < 0 {
+	if math.Signbit(f) {
 		sign, f = "-", -f
 	}
 	// the shortest digits that read back as f, and the exponent of the first: d.ddddde±XX
@@ -279,21 +278,17 @@ func FormatECMAScriptNumber(f float64) string {
 	digits := strings.Replace(mantissa, ".", "", 1)
 	exponent, _ := strconv.Atoi(exponentText)
 	k, n := len(digits), exponent+1
+	// the exponential form below 1e-6 and from 1e21; otherwise the digits padded with zeros, the digits with a point inside them, or "0." and zeros before the digits
 	switch {
-	case k <= n && n <= 21:
+	case n > 21 || n <= -6:
+		if k == 1 {
+			return sign + digits + "e" + fmt.Sprintf("%+d", n-1)
+		}
+		return sign + digits[:1] + "." + digits[1:] + "e" + fmt.Sprintf("%+d", n-1)
+	case k <= n:
 		return sign + digits + strings.Repeat("0", n-k)
-	case 0 < n && n <= 21:
+	case n > 0:
 		return sign + digits[:n] + "." + digits[n:]
-	case -6 < n && n <= 0:
-		return sign + "0." + strings.Repeat("0", -n) + digits
 	}
-	exp := n - 1
-	expSign := "+"
-	if exp < 0 {
-		expSign, exp = "-", -exp
-	}
-	if k == 1 {
-		return sign + digits + "e" + expSign + strconv.Itoa(exp)
-	}
-	return sign + digits[:1] + "." + digits[1:] + "e" + expSign + strconv.Itoa(exp)
+	return sign + "0." + strings.Repeat("0", -n) + digits
 }

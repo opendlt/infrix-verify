@@ -239,9 +239,10 @@ func checkVerificationMethod(i int, vm map[string]any) error {
 		}
 		xText, _ := jwk["x"].(string)
 		yText, _ := jwk["y"].(string)
-		x, errX := base64.RawURLEncoding.DecodeString(xText)
-		y, errY := base64.RawURLEncoding.DecodeString(yText)
-		if errX != nil || errY != nil || len(x) != 32 || len(y) != 32 {
+		// a coordinate that does not decode reads as empty, which the lengths refuse (part 25i: the decoders' errors decided nothing the lengths did not)
+		x, _ := base64.RawURLEncoding.DecodeString(xText)
+		y, _ := base64.RawURLEncoding.DecodeString(yText)
+		if len(x) != 32 || len(y) != 32 {
 			return docRefuse("%s %s: publicKeyJwk x and y must be 32-byte base64url values", kind, id)
 		}
 		if _, err := ParseSecp256k1PublicKey(append([]byte{4}, append(x, y...)...)); err != nil {

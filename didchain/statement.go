@@ -142,8 +142,6 @@ func DocumentHash(document []byte) ([]byte, error) {
 	return sum[:], nil
 }
 
-// envelopeMembers are the members a v2 envelope may carry; any other is refused (core decodes the envelope strictly).
-var envelopeMembers = map[string]bool{"document": true, "metadata": true, "hash": true, "hashAlgorithm": true, "version": true, "identity": true, "predecessor": true, "migration": true, "statement": true}
 
 func entryRefuse(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrEntry, fmt.Sprintf(format, args...))
@@ -258,10 +256,11 @@ func DecodeEntry(raw []byte) (*Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		version, errV := decodeString(predecessor["versionId"], "predecessor.versionId")
-		documentHash, errD := decodeBytes(predecessor["documentHash"], "predecessor.documentHash")
-		storageHash, errS := decodeBytes(predecessor["storageHash"], "predecessor.storageHash")
-		if errV != nil || errD != nil || errS != nil || strings.TrimSpace(version) == "" || len(documentHash) != 32 || len(storageHash) != 32 {
+		// a member that does not decode reads as empty, which the lengths below refuse, so the decoders' errors decide nothing the lengths do not (part 25i)
+		version, _ := decodeString(predecessor["versionId"], "predecessor.versionId")
+		documentHash, _ := decodeBytes(predecessor["documentHash"], "predecessor.documentHash")
+		storageHash, _ := decodeBytes(predecessor["storageHash"], "predecessor.storageHash")
+		if strings.TrimSpace(version) == "" || len(documentHash) != 32 || len(storageHash) != 32 {
 			return nil, entryRefuse("the predecessor binding is not a version and two hashes")
 		}
 		e.PredecessorStorageHash = storageHash
@@ -434,9 +433,7 @@ func (AnonAuthorizer) Authorize(previous, next *Entry, digest [32]byte) error {
 
 // stringOrArray reads a member that is one string or an array of strings (absent is none).
 func stringOrArray(raw json.RawMessage) []string {
-	if len(raw) == 0 {
-		return nil
-	}
+	// an absent member is empty raw JSON, which neither decode reads: nil
 	var one string
 	if json.Unmarshal(raw, &one) == nil {
 		return []string{one}

@@ -47,7 +47,8 @@ func secpAdd(a, b secpPoint) secpPoint {
 	}
 	var slope *big.Int
 	if a.x.Cmp(b.x) == 0 {
-		if new(big.Int).Add(a.y, b.y).Cmp(secpP) == 0 || a.y.Sign() == 0 && b.y.Sign() == 0 {
+		// equal x: b is a or -a. No point of secp256k1 has y = 0 (the group's order n is an odd prime, so no point has order 2), so b = -a exactly when the y sum to p
+		if new(big.Int).Add(a.y, b.y).Cmp(secpP) == 0 {
 			return secpPoint{inf: true}
 		}
 		// doubling: slope = 3x^2 / 2y
@@ -76,7 +77,8 @@ func secpMul(p secpPoint, k *big.Int) secpPoint {
 
 // secpOnCurve reports whether (x, y), both below p, satisfies y^2 = x^3 + 7.
 func secpOnCurve(x, y *big.Int) bool {
-	if x.Sign() < 0 || y.Sign() < 0 || x.Cmp(secpP) >= 0 || y.Cmp(secpP) >= 0 {
+	// both coordinates are reduced: each is its own residue mod p (0 <= v < p)
+	if new(big.Int).Mod(x, secpP).Cmp(x) != 0 || new(big.Int).Mod(y, secpP).Cmp(y) != 0 {
 		return false
 	}
 	rhs := modP(new(big.Int).Add(new(big.Int).Exp(x, big.NewInt(3), secpP), big.NewInt(7)))
@@ -85,7 +87,7 @@ func secpOnCurve(x, y *big.Int) bool {
 
 // secpLift is the point of x-coordinate x whose y has the parity odd, or false when no point has that x.
 func secpLift(x *big.Int, odd bool) (secpPoint, bool) {
-	if x.Cmp(secpP) >= 0 {
+	if new(big.Int).Mod(x, secpP).Cmp(x) != 0 { // x is not a reduced field element (an x of r + n past p names no point)
 		return secpPoint{}, false
 	}
 	rhs := modP(new(big.Int).Add(new(big.Int).Exp(x, big.NewInt(3), secpP), big.NewInt(7)))
@@ -192,7 +194,9 @@ func RecoverSecp256k1(rs []byte, recovery byte, hash []byte) (secpPoint, error) 
 	negE := new(big.Int).Mod(new(big.Int).Neg(e), secpN)
 	rInv := new(big.Int).ModInverse(r, secpN)
 	key := secpMul(secpAdd(secpMul(point, s), secpMul(secpG, negE)), rInv)
-	if key.inf || !VerifySecp256k1(key, hash, rs) {
+	// a finite recovered key always verifies (u1 G + u2 key = e/s G + (R - e/s G) = R, and R's x is r or r + n), so only the point at infinity is refused (part 25i:
+	// a verification here was a check no signature could fail)
+	if key.inf {
 		return secpPoint{}, errors.Join(ErrSecp256k1, errors.New("the signature recovers no key that verifies it"))
 	}
 	return key, nil

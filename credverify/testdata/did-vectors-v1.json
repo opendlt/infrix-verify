@@ -2177,6 +2177,274 @@
           }
         ],
         "valid": false
+      },
+      {
+        "name": "a did:pkh alias of an eip155 account: its personal_sign of the binding",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23#blockchainAccountId",
+              "foreignProofValue": "c2g8HxOkazxtHunbaWK2U4kLVJPZ/1B3sCl4IuSsiu0KPifuw0X0qw0IgY05cjT9Xu3t+n6gi5Qg9zfH/AfWyRw=",
+              "foreignSigner": "BE47ga+cIjTK0J1nnOYDXtE5I0fOZM5AX13NNiKKJd5uR/01xCFdHt9T5vg940RhXOcZvbD9h49u128G3Sd5Vt4=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\",\"did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "8d542aadf83a8ffda83ccd7e9f7e0f0f53ee0d829f4c8f7462c0be5b3f0bcf78"
+      },
+      {
+        "name": "a did:pkh alias of an eip155 account in its EIP-55 spelling",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2c7536E3605D9C16a7a3D7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2c7536E3605D9C16a7a3D7b1898e529396a65c23#blockchainAccountId",
+              "foreignProofValue": "tqlCMrqJ9iLcz3p9YM1B8a6oxCtksL/GioHJJNm5wNU/YUBxmo2UmYVM0p4Oa3OW7wT7hty/Tuzs3b3dxyAfcBs=",
+              "foreignSigner": "BE47ga+cIjTK0J1nnOYDXtE5I0fOZM5AX13NNiKKJd5uR/01xCFdHt9T5vg940RhXOcZvbD9h49u128G3Sd5Vt4=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2c7536E3605D9C16a7a3D7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\",\"did:pkh:eip155:1:0x2c7536E3605D9C16a7a3D7b1898e529396a65c23\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "575c6d1746610f0bcd0d761a55005ad88cced235c36dd8eaf23adeadb07eee1f"
+      },
+      {
+        "name": "a did:pkh alias of a solana account: its Ed25519 signature of the binding",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:FVen3X669xLzsi6N2V91DoiyzHzg1uAgqiT8jZ9nS96Z",
+              "foreignKeyId": "did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:FVen3X669xLzsi6N2V91DoiyzHzg1uAgqiT8jZ9nS96Z#blockchainAccountId",
+              "foreignProofValue": "ARtFNMllVTYu/QNzXBKoOPn+Wi+MWr3CIJiGdYZTcRqgKBkYF6j5/Vxlw0UNwUEd7ito6qypm9IoHeD5GQgjBg==",
+              "foreignSigner": "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:FVen3X669xLzsi6N2V91DoiyzHzg1uAgqiT8jZ9nS96Z",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\",\"did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:FVen3X669xLzsi6N2V91DoiyzHzg1uAgqiT8jZ9nS96Z\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "af7f93ffb492aaeee168925958de0b30fcb7da120a6e708a0f6aa5edfdb8e88e"
+      },
+      {
+        "name": "a did:pkh alias of a bip122 P2PKH account: its BIP-137 signature of the binding",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:bip122:000000000019d6689c085ae165831e93:1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH",
+              "foreignKeyId": "did:pkh:bip122:000000000019d6689c085ae165831e93:1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH#blockchainAccountId",
+              "foreignProofValue": "H2nefeUW2C0p1x5r3LUWrW8YgMnasMu881QverWpFVoiex/1CL81DPJQn+N1AIS0wut+BciOjAYnhPFl7I05Ar4=",
+              "foreignSigner": "Anm+Zn753LusVaBilc6HCwcCm/zbLc4o2VnygVsW+BeY",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:bip122:000000000019d6689c085ae165831e93:1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\",\"did:pkh:bip122:000000000019d6689c085ae165831e93:1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "e779878002572b9231fcfd47d40a0831d92c966d50fa63159c9c4b44f471eeb1"
+      },
+      {
+        "name": "a did:pkh alias of a cosmos account: its ADR-036 signature of the binding",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:cosmos:cosmoshub-4:cosmos1w508d6qejxtdg4y5r3zarvary0c5xw7k6ah60c",
+              "foreignKeyId": "did:pkh:cosmos:cosmoshub-4:cosmos1w508d6qejxtdg4y5r3zarvary0c5xw7k6ah60c#blockchainAccountId",
+              "foreignProofValue": "M9A0r0+0tOHFT24h2gID7yocY0XKQrmZ1W9TuiqRSyx+xpSCgGPFgd+VYcUIpSQo4ZMPtGjLKwZTOP5qL/o3Rg==",
+              "foreignSigner": "Anm+Zn753LusVaBilc6HCwcCm/zbLc4o2VnygVsW+BeY",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:cosmos:cosmoshub-4:cosmos1w508d6qejxtdg4y5r3zarvary0c5xw7k6ah60c",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\",\"did:pkh:cosmos:cosmoshub-4:cosmos1w508d6qejxtdg4y5r3zarvary0c5xw7k6ah60c\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "ecab900ed97cea7262166288b61cf02971256b46bfa990237921458648f4008e"
+      },
+      {
+        "name": "a did:pkh binding signed by another account",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23#blockchainAccountId",
+              "foreignProofValue": "dflQxdEMBqf3/6d2OkNYbvoc51B7lBP0fco486IT0I038RrXOztXWjGhui2LZZo7HSCMHmXZJ3opLM+EGhgouhw=",
+              "foreignSigner": "BMYEf5RB7X1tMEVAbpXAfNhcd45LjO88p6usCblccJ7lGuFo/qY9wzmjxYQZRmzq7vf2MmUyZtDhI2QxqVDP5So=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:pkh binding whose signature is over another binding",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23#blockchainAccountId",
+              "foreignProofValue": "NtBaSUpuRm2VFCDx8RYL03T1Cn9HXafGxsEwtZEygmQtie2848oBP6FCWk4U9NoIM8O/PpsbETVNNktnVcrcxhw=",
+              "foreignSigner": "BE47ga+cIjTK0J1nnOYDXtE5I0fOZM5AX13NNiKKJd5uR/01xCFdHt9T5vg940RhXOcZvbD9h49u128G3Sd5Vt4=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:pkh binding with no foreignSigner",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23#blockchainAccountId",
+              "foreignProofValue": "c2g8HxOkazxtHunbaWK2U4kLVJPZ/1B3sCl4IuSsiu0KPifuw0X0qw0IgY05cjT9Xu3t+n6gi5Qg9zfH/AfWyRw=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:pkh binding whose foreignSigner is another key",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23#blockchainAccountId",
+              "foreignProofValue": "c2g8HxOkazxtHunbaWK2U4kLVJPZ/1B3sCl4IuSsiu0KPifuw0X0qw0IgY05cjT9Xu3t+n6gi5Qg9zfH/AfWyRw=",
+              "foreignSigner": "BMYEf5RB7X1tMEVAbpXAfNhcd45LjO88p6usCblccJ7lGuFo/qY9wzmjxYQZRmzq7vf2MmUyZtDhI2QxqVDP5So=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:pkh binding whose foreignKeyId is not #blockchainAccountId",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23#key-1",
+              "foreignProofValue": "c2g8HxOkazxtHunbaWK2U4kLVJPZ/1B3sCl4IuSsiu0KPifuw0X0qw0IgY05cjT9Xu3t+n6gi5Qg9zfH/AfWyRw=",
+              "foreignSigner": "BE47ga+cIjTK0J1nnOYDXtE5I0fOZM5AX13NNiKKJd5uR/01xCFdHt9T5vg940RhXOcZvbD9h49u128G3Sd5Vt4=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:pkh alias of a namespace with no verifier",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV",
+              "foreignKeyId": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV#blockchainAccountId",
+              "foreignProofValue": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:pkh alias whose account its standard refuses (a broken EIP-55 checksum)",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:pkh:eip155:1:0x2C7536E3605D9C16a7a3D7b1898e529396a65c23",
+              "foreignKeyId": "did:pkh:eip155:1:0x2C7536E3605D9C16a7a3D7b1898e529396a65c23#blockchainAccountId",
+              "foreignProofValue": "Bo8w4f+F97snRG5S6B5Zr3Zb7oVJ6bTbC8jOzP/EcL4VLZMI3Cfn5ejRi2yJGlb6SS7fCaCfajGIf71ieHroIRs=",
+              "foreignSigner": "BE47ga+cIjTK0J1nnOYDXtE5I0fOZM5AX13NNiKKJd5uR/01xCFdHt9T5vg940RhXOcZvbD9h49u128G3Sd5Vt4=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:pkh:eip155:1:0x2C7536E3605D9C16a7a3D7b1898e529396a65c23",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
+      },
+      {
+        "name": "a did:key binding that carries a foreignSigner",
+        "operations": [
+          {
+            "binding": {
+              "foreignDid": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignKeyId": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B#z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+              "foreignProofValue": "KZYY2t3Il5vjdZytNgXJ76nzUtpP8bCqMRr971cCCLnpM+KR5ssJe7SMRlkfqMlgqn4Uw0SkR43ASU7KLSCaAw==",
+              "foreignSigner": "2pUoEqrJ8YJLGQck0SjfI7ZWF3PsSREBfDuSfhFpXRg=",
+              "infrixDid": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "infrixKeyId": "",
+              "infrixProofValue": null,
+              "nonce": "nonce-of-sixteen-chars"
+            },
+            "identifier": "did:key:z6MkuAWqab1vR1pnqF3QvNVCsNgZGmiva2ZAsceci2HjjK8B",
+            "type": "addAlsoKnownAs"
+          }
+        ],
+        "valid": false
       }
     ]
   },

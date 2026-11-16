@@ -542,14 +542,14 @@ func applyOperation(doc map[string]any, op Operation) error {
 		}
 		setList(doc, "controller", without(controllers, did), true)
 	case "addAlsoKnownAs", "removeAlsoKnownAs":
-		// the model's foreign document has no member a statement can carry, and a binding has its own seven members
+		// the model's foreign document has no member a statement can carry, and a binding has its own eight members
 		if foreign, ok := m["foreign"].(map[string]any); ok && len(foreign) != 0 {
 			return deriveRefuse("the member \"foreign\" carries members the model does not define")
 		}
 		if binding, ok := m["binding"].(map[string]any); ok {
 			for name := range binding {
 				switch name {
-				case "infrixDid", "foreignDid", "nonce", "infrixKeyId", "infrixProofValue", "foreignKeyId", "foreignProofValue":
+				case "infrixDid", "foreignDid", "nonce", "infrixKeyId", "infrixProofValue", "foreignKeyId", "foreignProofValue", "foreignSigner":
 				default:
 					return deriveRefuse("the binding carries the member %q, which it does not define", name)
 				}
@@ -656,9 +656,13 @@ func verifyDerivation(history []*Entry) error {
 }
 
 // verifyStoredBinding verifies a cross-method alias binding from the stored statement alone (core's VerifyStoredAliasBinding, rule for rule): the binding names the alias and the
-// document's own DID, its nonce is at least 16 characters, the alias is a did:key whose identifier is an Ed25519 Multikey, the foreign key id is <did>#<identifier>, and
-// foreignProofValue is that key's Ed25519 signature of the binding statement ("infrix-alias-binding/v1", infrixDid, foreignDid and nonce on four lines); an infrixProofValue, when present, verifies under the
-// document's authentication key infrixKeyId. A did:web or did:pkh alias (or any other method) is refused by name.
+// document's own DID, and its nonce is at least 16 characters. The foreign side:
+//   - a did:key: its identifier is an Ed25519 Multikey, the foreign key id is <did>#<identifier>, foreignProofValue is that key's Ed25519 signature of the binding statement
+//     ("infrix-alias-binding/v1", infrixDid, foreignDid and nonce on four lines), and the binding carries no foreignSigner;
+//   - a did:pkh (part 25h): its CAIP-10 account is valid under its namespace's address standard, the foreign key id is <did>#blockchainAccountId, and foreignProofValue is the
+//     account's signature of the binding statement in its namespace's message-signing standard, verified by the chain profile's namespace verifier with foreignSigner as the signer.
+//
+// Any other method (a did:web, whose keys its host serves) is refused by name. An infrixProofValue, when present, verifies under the document's authentication key infrixKeyId.
 func verifyStoredBinding(binding map[string]any, identifier string, doc map[string]any) error {
 	if binding == nil {
 		return deriveRefuse("%q is a DID of another method and needs a verified binding", identifier)
@@ -674,24 +678,52 @@ func verifyStoredBinding(binding map[string]any, identifier string, doc map[stri
 	if len(nonce) < 16 {
 		return deriveRefuse("the binding's nonce is shorter than 16 characters")
 	}
-	multikey, isKey := strings.CutPrefix(foreign, "did:key:")
-	if !isKey {
-		return deriveRefuse("%q: a stored binding verifies only a did:key, whose identifier is its key", foreign)
-	}
-	raw := []byte(nil)
-	if strings.HasPrefix(multikey, "z") {
-		raw = didaccounts.Base58Decode(multikey[1:])
-	}
-	if len(raw) != 34 || raw[0] != 0xed || raw[1] != 0x01 {
-		return deriveRefuse("the did:key %q is not an Ed25519 Multikey", foreign)
-	}
-	if str("foreignKeyId") != foreign+"#"+multikey {
-		return deriveRefuse("the foreign key is not the did:key's own key")
-	}
 	statement := []byte("infrix-alias-binding/v1\n" + infrix + "\n" + foreign + "\n" + nonce)
-	signature, err := base64.StdEncoding.DecodeString(str("foreignProofValue"))
-	if err != nil || len(signature) != ed25519.SignatureSize || !ed25519.Verify(raw[2:], statement, signature) {
-		return deriveRefuse("the foreign controller's signature does not verify")
+	signature, serr := base64.StdEncoding.DecodeString(str("foreignProofValue"))
+	signer, gerr := base64.StdEncoding.DecodeString(str("foreignSigner"))
+	if serr != nil || gerr != nil {
+		return deriveRefuse("the binding's foreignProofValue or foreignSigner is not base64")
+	}
+	switch {
+	case strings.HasPrefix(foreign, "did:key:"):
+		multikey := strings.TrimPrefix(foreign, "did:key:")
+		raw := []byte(nil)
+		if strings.HasPrefix(multikey, "z") {
+			raw = didaccounts.Base58Decode(multikey[1:])
+		}
+		if len(raw) != 34 || raw[0] != 0xed || raw[1] != 0x01 {
+			return deriveRefuse("the did:key %q is not an Ed25519 Multikey", foreign)
+		}
+		if str("foreignKeyId") != foreign+"#"+multikey {
+			return deriveRefuse("the foreign key is not the did:key's own key")
+		}
+		if len(signer) != 0 {
+			return deriveRefuse("a did:key binding carries no foreignSigner: the did:key is its own key")
+		}
+		if len(signature) != ed25519.SignatureSize || !ed25519.Verify(raw[2:], statement, signature) {
+			return deriveRefuse("the foreign controller's signature does not verify")
+		}
+	case strings.HasPrefix(foreign, "did:pkh:"):
+		parts := strings.Split(strings.TrimPrefix(foreign, "did:pkh:"), ":")
+		if len(parts) != 3 {
+			return deriveRefuse("the did:pkh %q is not namespace:reference:account (CAIP-10)", foreign)
+		}
+		canonical, err := didaccounts.NormalizeChainAccount(parts[0], parts[1], parts[2])
+		if err != nil {
+			return deriveRefuse("the did:pkh %q does not name an account of a supported namespace: %v", foreign, err)
+		}
+		verifier, ok := chainVerifiers[parts[0]]
+		if !ok {
+			return deriveRefuse("the did:pkh namespace %q has no verifier", parts[0])
+		}
+		if str("foreignKeyId") != foreign+"#blockchainAccountId" {
+			return deriveRefuse("the foreign key is not the did:pkh's own method #blockchainAccountId")
+		}
+		if err := verifier.Verify(ChainAccount{Namespace: parts[0], Reference: parts[1], Account: canonical}, statement, signer, signature); err != nil {
+			return deriveRefuse("the foreign account's signature does not verify under %s: %v", verifier.Scheme(), err)
+		}
+	default:
+		return deriveRefuse("%q: a stored binding verifies only a did:key (its identifier is its key) or a did:pkh (its account signs in its chain's standard)", foreign)
 	}
 	if text := str("infrixProofValue"); text != "" {
 		infrixSignature, err := base64.StdEncoding.DecodeString(text)

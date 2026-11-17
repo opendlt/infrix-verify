@@ -126,7 +126,7 @@ func TestEveryRefusalOfAChainsShapeIsHeldByItsOwnWords(t *testing.T) {
 		"another predecessor":          {func() *Entry { e := next("addService"); e.PredecessorStorageHash = []byte{8}; return e }(), genesis(), "the entry names predecessor"},
 		"a sequence that skips":        {func() *Entry { e := next("addService"); e.Sequence = 3; return e }(), genesis(), "sequence 3 after 1"},
 		"an update of no operation":    {next(), genesis(), "an update carries no operation"},
-		"a lifecycle beside another":   {next(OperationDeactivate, "addService"), genesis(), "a lifecycle operation is its own statement"},
+		"a lifecycle beside another":   {next(OperationDeactivate, "addService"), genesis(), "deactivate is the only operation of its statement"},
 		"an update of a deactivated":   {func() *Entry { e := next("addService"); e.Deactivated = true; return e }(), deactivated, "only a reactivation changes it"},
 		"a reactivation of the active": {next(OperationReactivate), genesis(), "a reactivation of a subject that is active"},
 		"a deactivation not stated":    {next(OperationDeactivate), genesis(), "deactivated=false and its operations yield deactivated=true"},

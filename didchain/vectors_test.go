@@ -130,7 +130,8 @@ func TestEveryChainParseVectorReachesItsVerdict(t *testing.T) {
 }
 
 func TestEveryAnonHistoryVectorReachesItsVerdict(t *testing.T) {
-	classes := map[string]error{"statement-chain-refused": ErrStatementChain, "anon-history-refused": ErrEntry}
+	classes := map[string]error{"statement-chain-refused": ErrStatementChain, "anon-history-refused": ErrEntry, "reactivation-final": ErrReactivationFinal, "reactivation-key": ErrReactivationKey,
+		"reactivation-proof": ErrReactivationProof, "time-after-ledger": ErrTimeAfterLedger, "time-before-predecessor": ErrTimeBeforePredecessor, "created-time": ErrCreatedTime, "ledger-time": ErrLedgerTime}
 	valid, refused := 0, 0
 	for _, v := range loadVectors(t).AnonHistory {
 		history := v.History
@@ -319,7 +320,8 @@ func TestEveryChainHistoryVectorReachesItsVerdict(t *testing.T) {
 	if err := json.Unmarshal(raw, &file); err != nil || len(file.ChainHistory) == 0 {
 		t.Fatalf("no chain-history vectors (%v)", err)
 	}
-	classes := map[string]error{"statement-chain-refused": ErrStatementChain, "anon-history-refused": ErrEntry}
+	classes := map[string]error{"statement-chain-refused": ErrStatementChain, "anon-history-refused": ErrEntry, "reactivation-final": ErrReactivationFinal, "reactivation-key": ErrReactivationKey,
+		"reactivation-proof": ErrReactivationProof, "time-after-ledger": ErrTimeAfterLedger, "time-before-predecessor": ErrTimeBeforePredecessor, "created-time": ErrCreatedTime, "ledger-time": ErrLedgerTime}
 	valid, refused := 0, 0
 	for _, v := range file.ChainHistory {
 		history := v.History

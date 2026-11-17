@@ -193,9 +193,24 @@ func decodeString(raw json.RawMessage, what string) (string, error) {
 	return text, nil
 }
 
+// envelopeMembers are the members a v2 envelope may carry; any other is refused (core decodes the envelope strictly). Restored from part 25i, which removed it as unused: it is the list
+// DecodeEntry holds an entry to.
+var envelopeMembers = map[string]bool{"document": true, "metadata": true, "hash": true, "hashAlgorithm": true, "version": true, "identity": true, "predecessor": true, "migration": true, "statement": true}
+
+// envelopeMemberNames are envelopeMembers' names, in a fixed order.
+func envelopeMemberNames() []string {
+	names := make([]string, 0, len(envelopeMembers))
+	for _, name := range []string{"document", "metadata", "hash", "hashAlgorithm", "version", "identity", "predecessor", "migration", "statement"} {
+		if envelopeMembers[name] {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 // DecodeEntry reads one registry entry's bytes: the v2 envelope of the canonical hash, its document hashed as stored, its bindings and its statement.
 func DecodeEntry(raw []byte) (*Entry, error) {
-	top, err := strictObject(raw, "the entry", "document", "metadata", "hash", "hashAlgorithm", "version", "identity", "predecessor", "migration", "statement")
+	top, err := strictObject(raw, "the entry", envelopeMemberNames()...)
 	if err != nil {
 		return nil, err
 	}
@@ -265,11 +280,12 @@ func DecodeEntry(raw []byte) (*Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		// a member that does not decode reads as empty, which the lengths below refuse, so the decoders' errors decide nothing the lengths do not (part 25i)
-		version, _ := decodeString(predecessor["versionId"], "predecessor.versionId")
-		documentHash, _ := decodeBytes(predecessor["documentHash"], "predecessor.documentHash")
-		storageHash, _ := decodeBytes(predecessor["storageHash"], "predecessor.storageHash")
-		if strings.TrimSpace(version) == "" || len(documentHash) != 32 || len(storageHash) != 32 {
+		// a member that does not decode reads as empty, which the lengths below refuse too (restored from part 25i; EQUIVALENT in the cut tables: every decoder error leaves an empty
+		// value, which the empty-version and length tests refuse first, so the two predicates agree on every input)
+		version, errV := decodeString(predecessor["versionId"], "predecessor.versionId")
+		documentHash, errD := decodeBytes(predecessor["documentHash"], "predecessor.documentHash")
+		storageHash, errS := decodeBytes(predecessor["storageHash"], "predecessor.storageHash")
+		if errV != nil || errD != nil || errS != nil || strings.TrimSpace(version) == "" || len(documentHash) != 32 || len(storageHash) != 32 {
 			return nil, entryRefuse("the predecessor binding is not a version and two hashes")
 		}
 		e.PredecessorStorageHash = storageHash
@@ -447,7 +463,10 @@ func (AnonAuthorizer) Authorize(previous, next *Entry, digest [32]byte) error {
 
 // stringOrArray reads a member that is one string or an array of strings (absent is none).
 func stringOrArray(raw json.RawMessage) []string {
-	// an absent member is empty raw JSON, which neither decode reads: nil
+	// an absent member is empty raw JSON (restored from part 25i; EQUIVALENT in the cut tables: neither decode reads empty raw JSON, so it reaches the same nil)
+	if len(raw) == 0 {
+		return nil
+	}
 	var one string
 	if json.Unmarshal(raw, &one) == nil {
 		return []string{one}

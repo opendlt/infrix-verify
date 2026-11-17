@@ -47,8 +47,9 @@ func secpAdd(a, b secpPoint) secpPoint {
 	}
 	var slope *big.Int
 	if a.x.Cmp(b.x) == 0 {
-		// equal x: b is a or -a. No point of secp256k1 has y = 0 (the group's order n is an odd prime, so no point has order 2), so b = -a exactly when the y sum to p
-		if new(big.Int).Add(a.y, b.y).Cmp(secpP) == 0 {
+		// equal x: b is a or -a. No point of secp256k1 has y = 0 (the group's order n is an odd prime, so no point has order 2), so b = -a exactly when the y sum to p; the doubling
+		// of a point with y = 0 is still answered as the point at infinity (restored from part 25i as defense in depth; a test adds two such points directly)
+		if new(big.Int).Add(a.y, b.y).Cmp(secpP) == 0 || a.y.Sign() == 0 && b.y.Sign() == 0 {
 			return secpPoint{inf: true}
 		}
 		// doubling: slope = 3x^2 / 2y
@@ -156,6 +157,10 @@ func secpScalars(rs []byte) (r, s *big.Int, err error) {
 }
 
 // VerifySecp256k1 verifies a low-s ECDSA signature r || s of a 32-byte hash under a public key (SEC 1 section 4.1.4).
+// verifyRecovered verifies a recovered key over its signature (VerifySecp256k1); it is a variable only so a test can make it refuse and hold RecoverSecp256k1's refusal. Production never
+// reassigns it.
+var verifyRecovered = VerifySecp256k1
+
 func VerifySecp256k1(key secpPoint, hash, rs []byte) bool {
 	r, s, err := secpScalars(rs)
 	if err != nil || len(hash) != 32 || key.inf {
@@ -194,9 +199,9 @@ func RecoverSecp256k1(rs []byte, recovery byte, hash []byte) (secpPoint, error) 
 	negE := new(big.Int).Mod(new(big.Int).Neg(e), secpN)
 	rInv := new(big.Int).ModInverse(r, secpN)
 	key := secpMul(secpAdd(secpMul(point, s), secpMul(secpG, negE)), rInv)
-	// a finite recovered key always verifies (u1 G + u2 key = e/s G + (R - e/s G) = R, and R's x is r or r + n), so only the point at infinity is refused (part 25i:
-	// a verification here was a check no signature could fail)
-	if key.inf {
+	// a finite recovered key always verifies (u1 G + u2 key = e/s G + (R - e/s G) = R, and R's x is r or r + n); the verification is restored from part 25i as defense in
+	// depth, through verifyRecovered, which a test makes refuse
+	if key.inf || !verifyRecovered(key, hash, rs) {
 		return secpPoint{}, errors.Join(ErrSecp256k1, errors.New("the signature recovers no key that verifies it"))
 	}
 	return key, nil

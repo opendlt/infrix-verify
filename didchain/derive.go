@@ -480,8 +480,9 @@ func applyOperation(doc map[string]any, op Operation) error {
 		if index < 0 {
 			return deriveRefuse("%s not found: %s", map[string]string{"verificationMethod": "verification method", "service": "service"}[listName], id)
 		}
-		// the items are the document's own objects (objects returns them, not copies), so each update above is in the document already (part 25i: a setObjects here
-		// rewrote the same objects and no cut could tell it was there)
+		// the items are the document's own objects (objects returns them, not copies), so each update above is in the document already; the list is written back as it is (restored
+		// from part 25i; EQUIVALENT in the cut tables: setObjects writes the same objects the document holds, so the document is the same with or without it)
+		setObjects(doc, listName, items)
 	case "addService":
 		svc, err := modelForm(m["service"], serviceMembers, "service")
 		if err != nil {

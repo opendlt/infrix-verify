@@ -357,6 +357,9 @@ func Verify(did, networkID string, history []*Entry, authorizer Authorizer) erro
 		if err := verifyShape(i, e, previous); err != nil {
 			return err
 		}
+		if err := verifyRecoveryKeyNotListed(i, history); err != nil {
+			return err
+		}
 		if want := authorizer.Scheme(e); want == "" || e.Scheme != want {
 			return chainRefusal(i, "the scheme is %q, the authorizer takes %q", e.Scheme, want)
 		}

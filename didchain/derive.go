@@ -435,6 +435,9 @@ func applyOperation(doc map[string]any, op Operation) error {
 		if err != nil {
 			return err
 		}
+		if op.Type == "updateService" {
+			id = resolveServiceReference(doc, id)
+		}
 		updates, _ := m["updates"].(map[string]any)
 		if len(updates) == 0 {
 			return deriveRefuse("no updates specified")
@@ -491,6 +494,9 @@ func applyOperation(doc map[string]any, op Operation) error {
 		if svc["id"] == "" || svc["type"] == "" || svc["serviceEndpoint"] == nil {
 			return deriveRefuse("the service's id, type and endpoint are required")
 		}
+		if sid, ok := svc["id"].(string); ok {
+			svc["id"] = resolveServiceReference(doc, sid)
+		}
 		services, err := objects(doc, "service")
 		if err != nil {
 			return err
@@ -506,6 +512,7 @@ func applyOperation(doc map[string]any, op Operation) error {
 		if err != nil {
 			return err
 		}
+		id = resolveServiceReference(doc, id)
 		services, err := objects(doc, "service")
 		if err != nil {
 			return err
@@ -755,4 +762,16 @@ func authenticationKeysOf(doc map[string]any, keyID string) (ed25519.PublicKey, 
 		}
 	}
 	return nil, deriveRefuse("the Infrix key %q has no Ed25519 Multikey in the document", keyID)
+}
+
+// resolveServiceReference is the service id an operation names, as the document stores it: a relative DID URL that is only a fragment ("#name", W3C DID
+// Core 3.2.2) is resolved against the id of the document the operation is applied to, so the document holds the absolute id and either form names the
+// same service. Its base is this document's own id, never anything the operation carries. The rule of the reference implementation (core
+// did.ResolveServiceReference) and of infrix-sdk-js's derivation, pinned by the shared vectors.
+func resolveServiceReference(doc map[string]any, ref string) string {
+	id, _ := doc["id"].(string)
+	if strings.HasPrefix(ref, "#") && len(ref) > 1 && id != "" && !strings.Contains(id, "#") {
+		return id + ref
+	}
+	return ref
 }

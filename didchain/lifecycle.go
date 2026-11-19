@@ -14,7 +14,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/opendlt/infrix-verify/didaccounts"
 )
 
 // THE REACTIVATION COMMITMENT AND THE LEDGER TIMES (infrix core part 25j, raise L2573), rule for rule as core's pkg/did/statementchain/lifecycle.go and pkg/did/ledger_time.go.
@@ -37,12 +40,13 @@ const (
 )
 
 // The refusals of the lifecycle and of the ledger times, each a statement-chain or an entry refusal, by its own name (the vectors' reactivation-final, reactivation-key,
-// reactivation-proof, time-after-ledger, time-before-predecessor, created-time and ledger-time).
+// reactivation-proof, recovery-key-listed (part 28e), time-after-ledger, time-before-predecessor, created-time and ledger-time).
 var (
 	ErrReactivationFinal     = fmt.Errorf("%w: the deactivation carries no reactivation commitment, so it is final", ErrStatementChain)
 	ErrReactivationKey       = fmt.Errorf("%w: the reactivation names no key, or the SHA-256 of its key is not the commitment", ErrStatementChain)
 	ErrReactivationProof     = fmt.Errorf("%w: the reactivation proof is absent or is not the committed key's signature over the statement's own digest", ErrStatementChain)
 	ErrLifecycleMember       = fmt.Errorf("%w: a lifecycle member is not the canonical base64 of a value of its length", ErrStatementChain)
+	ErrRecoveryKeyListed     = fmt.Errorf("%w: the reactivation commitment names a key the DID's documents list, so the key a deactivation stops could undo it", ErrStatementChain)
 	ErrTimeAfterLedger       = fmt.Errorf("%w: an entry states an updated time after its ledger time", ErrEntry)
 	ErrTimeBeforePredecessor = fmt.Errorf("%w: an entry states an updated time before the ledger time of the entry before it", ErrEntry)
 	ErrCreatedTime           = fmt.Errorf("%w: an entry states a created time that is not the first entry's", ErrEntry)
@@ -211,4 +215,49 @@ func decodeTime(raw json.RawMessage, what string) (time.Time, error) {
 		return time.Time{}, entryRefuse("%s is not an RFC 3339 time", what)
 	}
 	return at, nil
+}
+
+// listedEd25519Keys is every Ed25519 public key a document's verification methods list (a Multikey or Ed25519VerificationKey2020 whose publicKeyMultibase is z and the base58btc
+// of 0xed 0x01 and 32 bytes), rule for rule as core's ContractDIDDocument.ListedEd25519Keys. A document that does not decode lists none (CheckDocument refuses it elsewhere).
+func listedEd25519Keys(document json.RawMessage) [][]byte {
+	var doc struct {
+		VerificationMethod []struct {
+			Type               string `json:"type"`
+			PublicKeyMultibase string `json:"publicKeyMultibase"`
+		} `json:"verificationMethod"`
+	}
+	if json.Unmarshal(document, &doc) != nil {
+		return nil
+	}
+	var keys [][]byte
+	for _, vm := range doc.VerificationMethod {
+		if (vm.Type != "Multikey" && vm.Type != "Ed25519VerificationKey2020") || !strings.HasPrefix(vm.PublicKeyMultibase, "z") {
+			continue
+		}
+		if raw := didaccounts.Base58Decode(vm.PublicKeyMultibase[1:]); len(raw) == 34 && raw[0] == 0xed && raw[1] == 0x01 {
+			keys = append(keys, raw[2:])
+		}
+	}
+	return keys
+}
+
+// verifyRecoveryKeyNotListed refuses a deactivation whose reactivation commitment is the SHA-256 of an Ed25519 key any version of the history's documents up to and including it lists
+// (the method specification, Deactivate: the recovery key MUST NOT be a key the DID's documents list), as core's statementchain.Verify does since part 28e.
+func verifyRecoveryKeyNotListed(i int, history []*Entry) error {
+	e := history[i]
+	if len(e.Operations) != 1 || e.Operations[0].Type != OperationDeactivate {
+		return nil
+	}
+	commitment, err := lifecycleMember(e.Operations[0], MemberReactivationCommitment, sha256.Size)
+	if err != nil || commitment == nil {
+		return err
+	}
+	for j := 0; j <= i; j++ {
+		for _, key := range listedEd25519Keys(history[j].Document) {
+			if sum := sha256.Sum256(key); bytes.Equal(sum[:], commitment) {
+				return fmt.Errorf("entry %d: %w (a key version %s lists)", i, ErrRecoveryKeyListed, history[j].VersionID)
+			}
+		}
+	}
+	return nil
 }

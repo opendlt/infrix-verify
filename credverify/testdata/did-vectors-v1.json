@@ -2124,6 +2124,103 @@
         "sha256": "c47af9311fdd5c5b343155dc425ffe0899c9b6dcc58017c69bc2c03adb4c8389"
       },
       {
+        "name": "add a service by a relative id: it is stored absolute, against this document",
+        "operations": [
+          {
+            "service": {
+              "id": "#svc-r",
+              "serviceEndpoint": "https://r.example",
+              "type": "LinkedData"
+            },
+            "type": "addService"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"},{\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc-r\",\"serviceEndpoint\":\"https://r.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "d766949d237e070884e64215245960221c55191e95e7b5d8145ceccb754ea4a2"
+      },
+      {
+        "name": "add a service by a relative id, then remove it by the relative id",
+        "operations": [
+          {
+            "service": {
+              "id": "#svc-r",
+              "serviceEndpoint": "https://r.example",
+              "type": "LinkedData"
+            },
+            "type": "addService"
+          },
+          {
+            "serviceId": "#svc-r",
+            "type": "removeService"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "20e0e09d7cfadd1cb233656708a956cb6f0e1e92f713465b45a789fb2e41392a"
+      },
+      {
+        "name": "add a service by a relative id, then remove it by the absolute id",
+        "operations": [
+          {
+            "service": {
+              "id": "#svc-r",
+              "serviceEndpoint": "https://r.example",
+              "type": "LinkedData"
+            },
+            "type": "addService"
+          },
+          {
+            "serviceId": "did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc-r",
+            "type": "removeService"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"the service\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "20e0e09d7cfadd1cb233656708a956cb6f0e1e92f713465b45a789fb2e41392a"
+      },
+      {
+        "name": "remove a service stored absolute by its relative id",
+        "operations": [
+          {
+            "serviceId": "#svc",
+            "type": "removeService"
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "fb2b5b5f24ad8568b1c903e8b0c7d3d989602e6fed990f57d44de23bf845cb5a"
+      },
+      {
+        "name": "update a service by its relative id",
+        "operations": [
+          {
+            "serviceId": "#svc",
+            "type": "updateService",
+            "updates": {
+              "description": "described"
+            }
+          }
+        ],
+        "valid": true,
+        "document": "{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"alsoKnownAs\":[\"https://alice.example\"],\"assertionMethod\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"authentication\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\"],\"capabilityInvocation\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"controller\":[\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\"],\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"service\":[{\"description\":\"described\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#svc\",\"priority\":1,\"serviceEndpoint\":\"https://svc.example\",\"type\":\"LinkedData\"}],\"verificationMethod\":[{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-1\",\"publicKeyMultibase\":\"z6MkjEFwXoFxjAzLnHmzxevbVubQqgHR5N9ZTazzYHtGFtSG\",\"type\":\"Multikey\"},{\"controller\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"id\":\"did:infrix:v1:anon:g1-e3f3119213a1ead44647659d67e47f4269a2affb13f150aa87b20baacf93cf81:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#key-2\",\"keyPageUrl\":\"acc://alice.acme/book/1\",\"publicKeyMultibase\":\"z6MkhGsQ53Nu2iAEthjk1ApgP5cLcx7Qdixv9thy2LAduwki\",\"threshold\":2,\"type\":\"Multikey\"}]}",
+        "sha256": "62b054b8a7fee1eeba5284883824289b14ec315319dd78e6630bd24091a8272a"
+      },
+      {
+        "name": "add a service by a relative id that names a service it holds",
+        "operations": [
+          {
+            "service": {
+              "id": "#svc",
+              "serviceEndpoint": "https://x.example",
+              "type": "LinkedData"
+            },
+            "type": "addService"
+          }
+        ],
+        "valid": false
+      },
+      {
         "name": "add a key that exists",
         "operations": [
           {

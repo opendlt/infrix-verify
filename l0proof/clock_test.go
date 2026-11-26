@@ -1,6 +1,7 @@
 package l0proof_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -36,21 +37,22 @@ func TestClock_AppliedWhenSuppliedAndReportedUncheckedWhenNot(t *testing.T) {
 	}
 }
 
-// An expired trust fails with the clock: the latest trusted header is older than the trusting period, so it is not credited, and nothing
-// is. Bite: one hour inside the period it verifies; and a relying party's own shorter period is enforced and reported.
-func TestClock_ExpiredTrustFails(t *testing.T) {
+// Main's ruling 2026-11-26 (brief 28bs row 6 (d)): the trusting period bounds light-client hops, never the proof's age against the wall
+// clock. The Kermit trace is one step whose header (about 298 days after the compiled pin's time) is still signed by the pin's own validator
+// set, which the relying party trusts directly: with the clock three years ahead it still verifies, reported as trusted directly with the pin
+// time and the header time; and a relying party's own short period does not expire it either. (The refusals, a changed validator set over
+// the period and a multi-step hop over it, are TestCheckClockBoundsHopsNotTheProofsAge.)
+func TestClock_ATraceTrustedDirectlyByThePinNeverExpires(t *testing.T) {
 	f, last := lastHeaderTime(t)
-	mustFail(t, "a header past the 168h trusting period", f.chain, f.exp,
-		withClock(f, &l0proof.RelyingPartyClock{Now: last.Add(l0proof.DefaultTrustingPeriod)}), "expired")
-	mustVerify(t, f, f.chain, f.exp, withClock(f, &l0proof.RelyingPartyClock{Now: last.Add(l0proof.DefaultTrustingPeriod - time.Hour)}))
-	short := &l0proof.RelyingPartyClock{Now: last.Add(2 * time.Hour), TrustingPeriod: time.Hour}
-	r := mustFail(t, "a header past the relying party's own 1h period", f.chain, f.exp, withClock(f, short), "1h0m0s trusting period")
-	if r.ClockApplied {
-		t.Fatalf("a failed verdict still records an applied clock: %+v", r)
-	}
-	short.Now = last.Add(30 * time.Minute)
-	if r := mustVerify(t, f, f.chain, f.exp, withClock(f, short)); r.TrustingPeriod != time.Hour {
-		t.Fatalf("the relying party's period is not reported: %+v", r)
+	for _, c := range []*l0proof.RelyingPartyClock{
+		{Now: last.Add(3 * 365 * 24 * time.Hour)},
+		{Now: last.Add(2 * time.Hour), TrustingPeriod: time.Hour},
+	} {
+		r := mustVerify(t, f, f.chain, f.exp, withClock(f, c))
+		if !r.ClockApplied || r.Clock == nil || r.Clock.Case != l0proof.TrustedDirectly || !strings.Contains(r.Clock.Detail, "trusted directly: validator set unchanged since the pin") ||
+			r.Clock.MaxHopSpan != last.Sub(r.Clock.MeasuredFrom) {
+			t.Fatalf("a header signed by the pin's own set is trusted directly whatever its age: %+v", r.Clock)
+		}
 	}
 }
 

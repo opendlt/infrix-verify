@@ -26,9 +26,10 @@ func lastHeaderTime(t *testing.T) time.Time {
 	return time.Unix(last.Seconds, int64(last.Nanos)).UTC()
 }
 
-// Brief 28bs row 6 (d), main's ruling L3008 (d): the relying party's clock is wired. With a clock inside the trusting period the embedded
-// proofs verify (L4/G2) and the report says the clock was applied, with its time and bounds; with a clock past the trusting period the
-// anchor chain is refused (below L4); with no clock the verdict stands and the report says it is clock-unchecked.
+// Brief 28bs row 6 (d), main's ruling L3008 (d) and 2026-11-26: the relying party's clock is wired. The fixture's trace is two steps (hop-bounded,
+// each hop within the trusting period of the one before), so its age never expires it: with the clock an hour or three years after the header the embedded proofs verify (L4/G2)
+// and the report says the clock was applied, the drift checked, and which trust case held; a header from the future (the clock a minute
+// before it) is refused (below L4); with no clock the verdict stands and the report says it is clock-unchecked.
 func TestS28bsTheRelyingPartyClockIsAppliedAndReported(t *testing.T) {
 	at := lastHeaderTime(t)
 	o := accOpts(t)
@@ -37,14 +38,19 @@ func TestS28bsTheRelyingPartyClockIsAppliedAndReported(t *testing.T) {
 	if !r.Verified || r.ProofLevel != "L4" || r.GovernanceLevel != "G2" {
 		t.Fatalf("inside the trusting period: %s/%s verified=%v %s", r.ProofLevel, r.GovernanceLevel, r.Verified, detail(r, "embedded_l0_proof"))
 	}
-	if c := r.Clock; c == nil || !c.Applied || c.Now != at.Add(time.Hour).Format(time.RFC3339) || c.TrustingPeriod != l0proof.DefaultTrustingPeriod.String() ||
-		c.MaxClockDrift != l0proof.DefaultMaxClockDrift.String() {
-		t.Fatalf("the clock is not reported as applied with its time and bounds: %+v", r.Clock)
+	if c := r.Clock; c == nil || !c.Applied || !c.DriftChecked || c.Now != at.Add(time.Hour).Format(time.RFC3339) || c.TrustingPeriod != l0proof.DefaultTrustingPeriod.String() ||
+		c.MaxClockDrift != l0proof.DefaultMaxClockDrift.String() || c.Case != l0proof.HopBounded || c.MeasuredFrom == "" || c.Detail == "" {
+		t.Fatalf("the clock is not reported as applied with its time, bounds and trust case: %+v", r.Clock)
 	}
 
-	o.Clock = &l0proof.RelyingPartyClock{Now: at.Add(l0proof.DefaultTrustingPeriod + time.Hour)}
+	o.Clock = &l0proof.RelyingPartyClock{Now: at.Add(3 * 365 * 24 * time.Hour)}
+	if r := Verify(context.Background(), accPackage(t, nil), o); !r.Verified || r.ProofLevel != "L4" || r.GovernanceLevel != "G2" {
+		t.Fatalf("years later the bundle stays L4/G2 offline under its pin: %s/%s %s", r.ProofLevel, r.GovernanceLevel, detail(r, "embedded_l0_proof"))
+	}
+
+	o.Clock = &l0proof.RelyingPartyClock{Now: at.Add(-time.Minute)}
 	if r := Verify(context.Background(), accPackage(t, nil), o); r.ProofLevel == "L4" || checkStatus(r, "embedded_l0_proof") != CheckFail {
-		t.Fatalf("past the trusting period the anchor chain must be refused: %s %s", r.ProofLevel, detail(r, "embedded_l0_proof"))
+		t.Fatalf("a header from the future must be refused: %s %s", r.ProofLevel, detail(r, "embedded_l0_proof"))
 	}
 
 	o.Clock = nil

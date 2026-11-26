@@ -44,8 +44,15 @@ func l0Opts(opts Options) l0proof.Options {
 type ClockReport struct {
 	Applied        bool   `json:"applied"`
 	Now            string `json:"now,omitempty"`            // RFC 3339, UTC
+	DriftChecked   bool   `json:"driftChecked"`             // no header is timed after Now plus MaxClockDrift
 	TrustingPeriod string `json:"trustingPeriod,omitempty"` // a Go duration
 	MaxClockDrift  string `json:"maxClockDrift,omitempty"`  // a Go duration
+	// Case is l0proof.TrustedDirectly (the header is signed by the pin's own validator set, trusted directly: no hop to bound) or
+	// l0proof.HopBounded (every hop within the trusting period); MeasuredFrom is the pin's time and MaxHopSpan the longest hop.
+	Case         string `json:"case,omitempty"`
+	MeasuredFrom string `json:"measuredFrom,omitempty"`
+	MaxHopSpan   string `json:"maxHopSpan,omitempty"`
+	Detail       string `json:"detail,omitempty"`
 }
 
 // clockReportOf is the clock report for the verified embedded anchor chain's result.
@@ -53,7 +60,12 @@ func clockReportOf(res l0proof.Result) *ClockReport {
 	if !res.ClockApplied {
 		return &ClockReport{Applied: false}
 	}
-	return &ClockReport{Applied: true, Now: res.ClockNow.UTC().Format(time.RFC3339), TrustingPeriod: res.TrustingPeriod.String(), MaxClockDrift: res.MaxClockDrift.String()}
+	c := &ClockReport{Applied: true, Now: res.ClockNow.UTC().Format(time.RFC3339), DriftChecked: true, TrustingPeriod: res.TrustingPeriod.String(),
+		MaxClockDrift: res.MaxClockDrift.String()}
+	if v := res.Clock; v != nil {
+		c.Case, c.MeasuredFrom, c.MaxHopSpan, c.Detail = v.Case, v.MeasuredFrom.UTC().Format(time.RFC3339), v.MaxHopSpan.String(), v.Detail
+	}
+	return c
 }
 
 // TrustRoot is the pin a report's embedded-proof levels were verified against (Report.EmbeddedTrustRoot).

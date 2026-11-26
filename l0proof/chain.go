@@ -119,13 +119,16 @@ type Result struct {
 	TrustingPeriod time.Duration
 	MaxClockDrift  time.Duration
 	ClockNow       time.Time
+	// Clock is how the clock was applied when it was (brief 28bs row 6 (d)): the drift check against ClockNow, and the trust case
+	// (trusted directly by the pin, or hop-bounded) with the pin time it is measured from and the longest hop span.
+	Clock *ClockVerdict
 }
 
 func fail(r Result, format string, args ...any) Result {
 	r.Verified = false
 	r.Reason = fmt.Sprintf(format, args...)
 	r.TxHash, r.DirectoryRoot, r.DirectoryHeight = nil, nil, 0
-	r.ClockApplied, r.TrustingPeriod, r.MaxClockDrift, r.ClockNow = false, 0, 0, time.Time{}
+	r.ClockApplied, r.TrustingPeriod, r.MaxClockDrift, r.ClockNow, r.Clock = false, 0, 0, time.Time{}, nil
 	return r
 }
 
@@ -206,11 +209,11 @@ func Verify(c *L0ProofChain, exp Expectation, opts Options) Result {
 		return fail(res, "the Directory root %X is not the AppHash %X of the certified header at height %d", root, []byte(last.Header.AppHash), last.Header.Height)
 	}
 	if opts.Clock != nil {
-		tp, drift, err := checkClock(opts.Clock, c.Consensus, last)
+		cv, err := checkClock(opts.Clock, pin, c.Consensus)
 		if err != nil {
 			return fail(res, "relying-party clock: %v", err)
 		}
-		res.ClockApplied, res.TrustingPeriod, res.MaxClockDrift, res.ClockNow = true, tp, drift, opts.Clock.Now.UTC()
+		res.ClockApplied, res.TrustingPeriod, res.MaxClockDrift, res.ClockNow, res.Clock = true, cv.TrustingPeriod, cv.MaxClockDrift, opts.Clock.Now.UTC(), cv
 	}
 	res.Verified = true
 	res.TxHash, res.DirectoryRoot, res.DirectoryHeight = txHash, root, last.Header.Height

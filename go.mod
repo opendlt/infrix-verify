@@ -9,9 +9,14 @@ module github.com/opendlt/infrix-verify
 
 go 1.25.7
 
-require github.com/opendlt/infrix-schema v0.7.2-0.20261126122216-85329e158d7d
+require github.com/opendlt/infrix-schema v0.7.2-0.20261126130258-7a5f7818dbd8
 
-require github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
+require golang.org/x/sys v0.42.0 // indirect
+
+require (
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0
+	golang.org/x/crypto v0.49.0
+)
 
 require (
 	github.com/cayleygraph/quad v1.3.0 // indirect

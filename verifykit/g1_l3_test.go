@@ -99,7 +99,8 @@ func checkStatus(r *Report, name string) CheckStatus {
 	return ""
 }
 
-// A real signature in every scheme the verifier implements credits G1.
+// A real signature verifies in every scheme the verifier implements, and is NOT enough for G1: G1 also needs the approver key proven on its page
+// (approval_key_pages, brief 28bh), which this bundle does not embed, so it stays G0. The positive G1 is TestWithoutAnAccumulateTransactionTheBundleIsExactlyL3G1.
 func TestG1IsCreditedFromAVerifiedSignatureInEveryScheme(t *testing.T) {
 	for _, scheme := range []string{
 		evidence.ApprovalSigTypeInfrixEd25519,
@@ -108,14 +109,14 @@ func TestG1IsCreditedFromAVerifiedSignatureInEveryScheme(t *testing.T) {
 		evidence.ApprovalSigTypeAccumulatePrefix + "eth",
 	} {
 		r := verifyWithApprovals(t, false, signedApproval(t, scheme, planHashVK()))
-		if !r.Verified || r.GovernanceLevel != "G1" || checkStatus(r, "approval_signatures") != CheckPass {
-			t.Errorf("%s: verified=%v governance=%s approval_signatures=%s, want a verified G1 (%+v)", scheme, r.Verified, r.GovernanceLevel, checkStatus(r, "approval_signatures"), r.Checks)
+		if !r.Verified || r.GovernanceLevel != "G0" || checkStatus(r, "approval_signatures") != CheckPass || checkStatus(r, "approval_key_pages") != CheckSkip {
+			t.Errorf("%s: verified=%v governance=%s approval_signatures=%s, want a verified signature capped at G0 without a key-page proof (%+v)", scheme, r.Verified, r.GovernanceLevel, checkStatus(r, "approval_signatures"), r.Checks)
 		}
 	}
-	// two approvals, both signed, still G1
+	// two approvals, both signed, still G0 without key-page proofs
 	r := verifyWithApprovals(t, false, signedApproval(t, evidence.ApprovalSigTypeInfrixEd25519, planHashVK()), signedApproval(t, evidence.ApprovalSigTypeAccumulatePrefix+"btc", planHashVK()))
-	if r.GovernanceLevel != "G1" {
-		t.Fatalf("two signed approvals: governance %s, want G1", r.GovernanceLevel)
+	if r.GovernanceLevel != "G0" || checkStatus(r, "approval_signatures") != CheckPass {
+		t.Fatalf("two signed approvals: governance %s, want G0 with both signatures verified and no key-page proof", r.GovernanceLevel)
 	}
 }
 

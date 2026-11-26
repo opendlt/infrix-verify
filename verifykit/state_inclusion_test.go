@@ -262,8 +262,8 @@ func TestIntegrityIsAPreconditionOfEveryLevel(t *testing.T) {
 	pkg := buildPortableWith(t, true, root, "outcome-vk", nil, func(b *evidence.EvidenceBundle, _ *evidence.BuildPortablePackageInputs) {
 		b.StorageProofs, b.AccountProofs = storage, account
 	})
-	if r := Verify(context.Background(), pkg, Options{}); r.ProofLevel != "L3" || r.GovernanceLevel != "G1" {
-		t.Fatalf("premise: the untampered package verifies at %s/%s, want L3/G1", r.ProofLevel, r.GovernanceLevel)
+	if r := Verify(context.Background(), pkg, Options{}); r.ProofLevel != "L3" || r.GovernanceLevel != "G0" {
+		t.Fatalf("premise: the untampered package verifies at %s/%s, want L3/G0 (its approval is signed but no key-page proof puts its key on its page)", r.ProofLevel, r.GovernanceLevel)
 	}
 	tampered := *pkg
 	tampered.OutcomeDigest = sha256.Sum256([]byte("another outcome"))

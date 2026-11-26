@@ -239,11 +239,12 @@ func TestVerifyKitWithholdsG2FromSelfAssertedCredential(t *testing.T) {
 	if r.ProofLevel != "L4" {
 		t.Errorf("proofLevel = %q, want L4 (L0-confirmed anchor)", r.ProofLevel)
 	}
-	if r.GovernanceLevel != "G1" {
-		t.Errorf("governanceLevel = %q, want G1 (credential proof is self-asserted, not independently verified)", r.GovernanceLevel)
+	// G0: the approval is signed but its key is not proven on its page (brief 28bh), and the credential is self-asserted; never G2
+	if r.GovernanceLevel != "G0" {
+		t.Errorf("governanceLevel = %q, want G0 (self-asserted credential, and no key-page proof)", r.GovernanceLevel)
 	}
-	if r.Tier != "L4/G1" {
-		t.Errorf("tier = %q, want L4/G1", r.Tier)
+	if r.Tier != "L4/G0" {
+		t.Errorf("tier = %q, want L4/G0", r.Tier)
 	}
 	if r.AssuranceClass == "high_assurance" {
 		t.Errorf("assuranceClass = %q; a self-asserted credential must not reach high_assurance (DX P0-5b)", r.AssuranceClass)
@@ -272,11 +273,10 @@ func TestVerifyKitCreditsG2WhenExternalProofIndependentlyConfirmed(t *testing.T)
 	if !withConf.Verified {
 		t.Fatalf("should verify: %+v", withConf.Checks)
 	}
-	if withConf.GovernanceLevel != "G2" {
-		t.Errorf("governanceLevel = %q, want G2 (external proof independently confirmed + anchored)", withConf.GovernanceLevel)
-	}
-	if withConf.Tier != "L4/G2" {
-		t.Errorf("tier = %q, want L4/G2", withConf.Tier)
+	// a confirmed credential is necessary for G2 when one is referenced, never sufficient: this bundle has no key-page proof and no
+	// Accumulate-executed approval (brief 28bh); the positive G2 is TestAccumulateProvenBundleReachesL4G2Offline
+	if withConf.GovernanceLevel != "G0" || checkStatus(withConf, "external_proof") != CheckPass {
+		t.Errorf("governanceLevel = %q external_proof = %s, want G0 with the credential confirmed", withConf.GovernanceLevel, checkStatus(withConf, "external_proof"))
 	}
 
 	// Without the confirmer, the self-asserted flag must NOT reach G2.
@@ -292,7 +292,7 @@ func TestVerifyKitRequireLevelFailsClosed(t *testing.T) {
 	// independently confirmable (L4), but the credential proof is self-asserted
 	// so governance caps at G1 until independent credential verification lands
 	// (credverify, DX P1-4 / see P0-5b).
-	req, err := ParseRequiredLevel("L4/G1")
+	req, err := ParseRequiredLevel("L4/G0") // the approval key is not proven on its page, so G0 is this bundle's honest governance (brief 28bh)
 	if err != nil {
 		t.Fatalf("ParseRequiredLevel: %v", err)
 	}

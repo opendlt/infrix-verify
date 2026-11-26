@@ -1,0 +1,11 @@
+{
+  "api": "https://kermit.accumulatenetwork.io/v3",
+  "capturedAt": "2026-11-26T12:30:39Z",
+  "cometbft": "http://kermit.accumulatenetwork.io:16592",
+  "command": "go run ./cmd/capture-kermit -out ../l0proof/testdata/kermit -txid acc://12e0a1473967de9ee596c15e53f36ecb6f98936fe5016dd4788aab38d4bdea1d@infrixdevnet-1782843230226786400-1.acme/data",
+  "directoryBlock": 13818125,
+  "headerHeight": 13818126,
+  "partition": "BVN1",
+  "pin": "pin:7525f11062a3228f9e6f68b5afbc7b0e9e95a8d5e4ec94b29ef8709543c8199e",
+  "txid": "acc://12e0a1473967de9ee596c15e53f36ecb6f98936fe5016dd4788aab38d4bdea1d@infrixdevnet-1782843230226786400-1.acme/data"
+}

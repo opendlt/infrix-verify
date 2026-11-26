@@ -778,6 +778,10 @@ func (r *Report) checkExternalProof(ctx context.Context, bundle *evidence.Eviden
 				r.add("external_proof", CheckFail, fmt.Sprintf("external proof %d: embedded chain: %v (governance caps at G1)", i, err))
 				return false, false
 			}
+			if why, unheld := unheldPin(chain.Incarnation, opts); unheld {
+				r.add("external_proof", CheckSkip, fmt.Sprintf("external proof %d: embedded chain %s (governance caps at G1)", i, why))
+				return false, false
+			}
 			res := l0proof.Verify(chain, l0proof.Expectation{AnchorAccount: ep.Account, Leaf: ep.ProofHash[:]}, l0Opts(opts))
 			if !res.Verified {
 				r.add("external_proof", CheckFail, fmt.Sprintf("external proof %d: embedded chain does not confirm it: %s (governance caps at G1)", i, res.Reason))

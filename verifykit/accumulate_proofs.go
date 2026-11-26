@@ -39,6 +39,26 @@ func l0Opts(opts Options) l0proof.Options {
 	return l0proof.Options{Network: network, OverridePin: opts.L0Pin}
 }
 
+// PinFlagHint is how a relying party passes a pin the verifier does not compile in (brief 28bl row 1): a local run writes its network's pin next
+// to its bundle, and the verifier takes it only when the relying party passes it explicitly.
+const PinFlagHint = "pass that network's pin explicitly (infrix verify --l0-pin <pin file>; a local run writes pin.local-embedded.json next to its bundle)"
+
+// unheldPin names the pin a proof was captured under when the relying party passed NO pin and the proof's incarnation is not the compiled pin of the
+// network the verifier was told to use (brief 28bl row 1). Such a proof cannot be judged at all, because the verifier holds no trust root for it: it is
+// not credited, and the report names the pin the relying party must pass to judge it. It is never credited from the bundle. With an explicit pin, a
+// mismatch is a refusal (the proof's own verification fails), never this.
+func unheldPin(incarnation string, opts Options) (string, bool) {
+	if opts.L0Pin != nil {
+		return "", false
+	}
+	o := l0Opts(opts)
+	pin, err := l0proof.CompiledPin(o.Network)
+	if err != nil || incarnation == pin.ID() {
+		return "", false
+	}
+	return fmt.Sprintf("captured under pin %q, which this verifier does not hold (its trust root is the compiled %s pin %q): %s", incarnation, o.Network, pin.ID(), PinFlagHint), true
+}
+
 // txPrincipal reads a transaction header's principal (field 1, a URL): the anchor account the WriteData names. The account adds no trust: what L4 proves
 // is that this batch root was written to Accumulate by a transaction Accumulate executed before a certified Directory height.
 func txPrincipal(header []byte) string {
@@ -65,6 +85,10 @@ func (r *Report) checkEmbeddedL0Proof(bundle *evidence.EvidenceBundle, parsed, a
 	chain, err := l0proof.Decode(bundle.L0Proof, nil)
 	if err != nil {
 		r.add(name, CheckFail, err.Error())
+		return false
+	}
+	if why, unheld := unheldPin(chain.Incarnation, opts); unheld {
+		r.add(name, CheckSkip, "the L0 proof chain was "+why+" (proof level caps at L3 offline)")
 		return false
 	}
 	root := bundle.AnchorInclusion.BatchRoot
@@ -98,6 +122,10 @@ func (r *Report) checkApprovalKeyPages(bundle *evidence.EvidenceBundle, approval
 		var p govproof.KeyPageProof
 		if err := decodeStrict(raw, &p); err != nil {
 			r.add(name, CheckFail, fmt.Sprintf("key-page proof %d: %v", i, err))
+			return false
+		}
+		if why, unheld := unheldPin(p.Incarnation, opts); unheld {
+			r.add(name, CheckSkip, fmt.Sprintf("key-page proof %d was %s (governance caps at G0)", i, why))
 			return false
 		}
 		res := govproof.VerifyKeyPage(&p, l0Opts(opts))
@@ -184,6 +212,10 @@ func (r *Report) checkGovernanceExecution(bundle *evidence.EvidenceBundle, planH
 	var g govproof.GovernanceExecution
 	if err := decodeStrict(bundle.GovernanceExecution, &g); err != nil {
 		r.add(name, CheckFail, err.Error())
+		return false
+	}
+	if why, unheld := unheldPin(g.Receipt.Incarnation, opts); unheld {
+		r.add(name, CheckSkip, "the governance execution was "+why+" (governance caps at G1)")
 		return false
 	}
 	res := govproof.VerifyGovernance(&g, govproof.GovernanceExpectation{Account: opts.GovernanceAccount, Page: opts.GovernancePage, PlanHash: planHash, BundleID: bundle.ID}, l0Opts(opts))

@@ -283,17 +283,30 @@ func TestBD03_TheGovernanceExecutionOfAnotherBundleFails(t *testing.T) {
 	}
 }
 
-// PN-01: the embedded proofs verify only against the pin the RELYING PARTY chose; with the compiled Kermit pin a simulator chain is refused, and the
-// verdict never rises above L3/G0.
+// PN-01: the embedded proofs verify only against the pin the RELYING PARTY chose. With no pin passed the verifier holds only the compiled Kermit pin,
+// so a simulator chain cannot be judged at all: nothing embedded is credited (the verdict is L3/G0 from the verifier's own recomputation), and every
+// embedded check names the pin the relying party must pass (brief 28bl row 1). With an explicit pin of another network, the chain is refused.
 func TestTheEmbeddedProofsUseTheVerifiersPinNeverTheBundles(t *testing.T) {
 	o := accOpts(t)
 	o.L0Pin = nil
 	r := Verify(context.Background(), accPackage(t, nil), o)
-	if r.ProofLevel == "L4" || r.GovernanceLevel == "G1" || r.GovernanceLevel == "G2" {
-		t.Fatalf("a simulator proof was credited under the Kermit pin: %s/%s", r.ProofLevel, r.GovernanceLevel)
+	if r.ProofLevel != "L3" || r.GovernanceLevel != "G0" || !r.Verified {
+		t.Fatalf("with no pin passed: verified %v %s/%s, want a verified L3/G0 (nothing embedded credited): %+v", r.Verified, r.ProofLevel, r.GovernanceLevel, r.Checks)
 	}
-	if !strings.Contains(detail(r, "embedded_l0_proof"), "not the verifier's pin") {
-		t.Fatalf("embedded_l0_proof: %s", detail(r, "embedded_l0_proof"))
+	for _, c := range []string{"embedded_l0_proof", "approval_key_pages", "governance_execution"} {
+		if d := detail(r, c); !strings.HasPrefix(d, string(CheckSkip)+":") || !strings.Contains(d, "which this verifier does not hold") || !strings.Contains(d, PinFlagHint) {
+			t.Fatalf("%s does not name the pin to pass: %s", c, d)
+		}
+	}
+	other := loadAccProofs(t).Pin
+	other.ChainID += "-other"
+	o.L0Pin = &other
+	r = Verify(context.Background(), accPackage(t, nil), o)
+	if r.ProofLevel == "L4" || r.GovernanceLevel == "G1" || r.GovernanceLevel == "G2" || r.Verified {
+		t.Fatalf("a chain was credited (or passed) under another explicit pin: verified %v %s/%s", r.Verified, r.ProofLevel, r.GovernanceLevel)
+	}
+	if d := detail(r, "embedded_l0_proof"); !strings.HasPrefix(d, string(CheckFail)+":") || !strings.Contains(d, "not the verifier's pin") {
+		t.Fatalf("embedded_l0_proof under another explicit pin: %s", d)
 	}
 }
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/opendlt/infrix-schema/assurance"
 	"github.com/opendlt/infrix-schema/evidence"
+	"github.com/opendlt/infrix-verify/l0proof/consensus"
 	"github.com/opendlt/infrix-verify/stateroot"
 	"github.com/opendlt/infrix-verify/witness"
 )
@@ -247,6 +248,16 @@ type Options struct {
 	// StateRootAnchors reads an L0 anchor entry, its listed roots and its canonical window (the verifier's port, like L0Confirmer). Nil means no L0 endpoint was supplied: a consistent
 	// proof is then a SKIP, exactly as l0_anchor is, because that the node anchored the seal is not independently confirmed.
 	StateRootAnchors stateroot.AnchorReader
+	// L0Network names the network whose COMPILED pin the embedded Accumulate proofs (l0Proof, keyPageProofs, governanceExecution) are verified against;
+	// empty means Kermit, the only network with a compiled pin. L0Pin, when non-nil, is an explicit relying-party pin used instead (a devnet's in-process
+	// simulator pin, an earlier Kermit incarnation); the report names it. Neither is ever read from the bundle (native proof plan PN-01).
+	L0Network string
+	L0Pin     *consensus.Pin
+	// GovernanceAccount and GovernancePage are the app's governance data account and key page, named by the RELYING PARTY. G2 is credited only from an
+	// Accumulate-executed approval under exactly this page to exactly this account; with either empty, governance caps at G1.
+	GovernanceAccount string
+	GovernancePage    string
+
 	// RequireStateRootProof turns a SKIP (no document, awaiting the next anchor, no endpoint) into a failure, for a verifier that accepts only a bundle whose state
 	// root is proven against L0.
 	RequireStateRootProof bool
@@ -311,6 +322,12 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	l0Confirmed := report.checkL0Anchor(ctx, &bundle, anchored, opts.L0Confirmer)
 	externalProofConfirmed := report.checkExternalProof(ctx, &bundle, opts.ExternalProofConfirmer)
 
+	// The embedded Accumulate proofs, each against the verifier's own pin (native proof plan phases 5 and 7): offline L4, the approver keys on their
+	// pages (G1) and the Accumulate-executed approval (G2).
+	l0Embedded := report.checkEmbeddedL0Proof(&bundle, bundleParsed, anchored, opts)
+	keyPagesProven := report.checkApprovalKeyPages(&bundle, approvalsSigned, opts)
+	governanceExecuted := report.checkGovernanceExecution(&bundle, pkg.PlanHash, bundleParsed, opts)
+
 	// The bundle's state root against the node's anchored root history. It changes no level (the ladder has no state-root rung); a FAIL is a failure of the
 	// bundle, and so of the cryptographic verdict below.
 	if bundleParsed {
@@ -341,8 +358,8 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	})
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
-	proof := computeProofLevel(stateProven.Storage, stateProven.Account, anchored, l0Confirmed)
-	gov := computeGovernanceLevel(&bundle, bundleParsed, approvalsSigned, externalProofConfirmed, anchored)
+	proof := computeProofLevel(stateProven.Storage, stateProven.Account, anchored, l0Confirmed || l0Embedded)
+	gov := computeGovernanceLevel(&bundle, bundleParsed, approvalsSigned && keyPagesProven, governanceExecuted, externalProofConfirmed, anchored)
 	// Integrity is a precondition of every level, not a level (native proof plan PV-INT-01): a package whose export hash, plan binding,
 	// evidence chain or outcome digest does not recompute proves nothing, whatever else it carries.
 	if !report.integrityHolds() {
@@ -350,11 +367,16 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	}
 	report.finalizeLevels(proof, gov, opts.Require)
 	if proof == assurance.ProofLevelL0Settlement {
-		report.ProofLevelSource = ProofSourceLiveQuery
+		// an embedded, pinned, fully verified chain is the offline source; a live query alone is the other
+		if l0Embedded {
+			report.ProofLevelSource = ProofSourceEmbeddedProof
+		} else {
+			report.ProofLevelSource = ProofSourceLiveQuery
+		}
 	}
 
 	// Derived layered-verification flags (mirror the Nexus inspector).
-	report.L0Verified = l0Confirmed
+	report.L0Verified = l0Confirmed || l0Embedded
 	report.ReplayAvailable = report.Replay != nil && report.Replay.Available
 	report.ReplayVerified = report.Replay != nil && report.Replay.Available && report.Replay.Matched
 	report.SemanticVerified = report.ReplayVerified

@@ -636,8 +636,10 @@ func (r *Report) checkAnchorProof(pkg *evidence.PortableEvidencePackage, bundle 
 	}
 	// The root is named by its first 12 bytes: the full value is in the bundle, and a rendered report carries no 32-byte hex run a
 	// secret scanner cannot tell from key material (infrix-core's agent self-test, brief 28bj).
-	r.add("anchor_proof", CheckPass, fmt.Sprintf("bundle hash proven at leaf %d of the %d-leaf batch root %x…",
-		bundle.AnchorInclusion.LeafIndex, bundle.AnchorInclusion.LeafCount, bundle.AnchorInclusion.BatchRoot[:12]))
+	// The one batch tree hashes sorted pairs (brief 28bk row 2): the path proves membership at the batch's depth, never the position, so
+	// the report states membership and says the position is not bound; LeafIndex is not reported as verified.
+	r.add("anchor_proof", CheckPass, fmt.Sprintf("bundle hash proven a member of the %d-leaf batch root %x… (the hash binds membership, not the leaf position)",
+		bundle.AnchorInclusion.LeafCount, bundle.AnchorInclusion.BatchRoot[:12]))
 	return true
 }
 

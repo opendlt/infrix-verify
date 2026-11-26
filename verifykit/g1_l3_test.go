@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -242,9 +243,6 @@ func TestL3RefusesATamperedInclusionOrAnchorRecord(t *testing.T) {
 		"batch root": func(b *evidence.EvidenceBundle, _ *evidence.BuildPortablePackageInputs) {
 			b.AnchorInclusion.BatchRoot[0] ^= 1
 		},
-		"leaf index": func(b *evidence.EvidenceBundle, _ *evidence.BuildPortablePackageInputs) {
-			b.AnchorInclusion.LeafIndex = 0
-		},
 		"cut path": func(b *evidence.EvidenceBundle, _ *evidence.BuildPortablePackageInputs) {
 			b.AnchorInclusion.Path = b.AnchorInclusion.Path[:1]
 		},
@@ -266,6 +264,27 @@ func TestL3RefusesATamperedInclusionOrAnchorRecord(t *testing.T) {
 		if r.ProofLevel == "L3" || r.ProofLevel == "L4" || r.Verified {
 			t.Errorf("%s: proof %s verified %v; want neither L3/L4 nor verified (%+v)", name, r.ProofLevel, r.Verified, r.Checks)
 		}
+	}
+}
+
+// WHAT THE INCLUSION PROVES (brief 28bk row 2, main's condition): the one batch tree hashes sorted pairs, so a path binds membership and
+// not the position. An inclusion whose LeafIndex names another real leaf, with a valid path, is judged by what it proves: L3 is credited
+// (no false refusal) and the report claims membership, never the index (no false "position verified").
+func TestAWrongLeafIndexWithAValidPathIsJudgedByWhatItProves(t *testing.T) {
+	r := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", nil, func(b *evidence.EvidenceBundle, _ *evidence.BuildPortablePackageInputs) {
+		if b.AnchorInclusion.LeafCount < 2 {
+			t.Fatalf("premise: a multi-leaf batch, got %d leaves", b.AnchorInclusion.LeafCount)
+		}
+		b.AnchorInclusion.LeafIndex = (b.AnchorInclusion.LeafIndex + 1) % b.AnchorInclusion.LeafCount
+	}), Options{})
+	detail := ""
+	for _, c := range r.Checks {
+		if c.Name == "anchor_proof" {
+			detail = string(c.Status) + ": " + c.Detail
+		}
+	}
+	if r.ProofLevel != "L3" || !r.Verified || !strings.Contains(detail, "member of the") || !strings.Contains(detail, "not the leaf position") || strings.Contains(detail, "at leaf") {
+		t.Fatalf("a valid path under another index: proof %s verified %v, anchor_proof %q; want a verified L3 that claims membership and states the position is not bound", r.ProofLevel, r.Verified, detail)
 	}
 }
 

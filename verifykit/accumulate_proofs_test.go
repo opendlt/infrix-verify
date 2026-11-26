@@ -374,3 +374,20 @@ func TestApprovalKeyPagesRefuseEveryMismatch(t *testing.T) {
 		}
 	}
 }
+
+// brief 28bl row 1: the report names the pin its embedded-proof levels rest on (network, ID, supplied by the relying party), so a surface can say
+// whose network an L4/G2 is relative to; with nothing credited from an embedded proof there is no trust root to name.
+func TestTheReportNamesTheTrustRootOfItsEmbeddedLevels(t *testing.T) {
+	o := accOpts(t)
+	r := Verify(context.Background(), accPackage(t, nil), o)
+	if r.LevelSources["L4"] != LevelSourceEmbeddedProof || r.EmbeddedTrustRoot == nil {
+		t.Fatalf("an embedded L4 names no trust root: %v %+v", r.LevelSources, r.EmbeddedTrustRoot)
+	}
+	if tr := r.EmbeddedTrustRoot; tr.Network != o.L0Pin.Network || tr.Pin != o.L0Pin.ID() || !tr.Supplied {
+		t.Fatalf("the trust root is %+v, want the relying party's pin %s %s", tr, o.L0Pin.Network, o.L0Pin.ID())
+	}
+	o.L0Pin = nil
+	if r := Verify(context.Background(), accPackage(t, nil), o); r.EmbeddedTrustRoot != nil {
+		t.Fatalf("nothing embedded was credited, yet the report names a trust root: %+v", r.EmbeddedTrustRoot)
+	}
+}

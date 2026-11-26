@@ -39,6 +39,26 @@ func l0Opts(opts Options) l0proof.Options {
 	return l0proof.Options{Network: network, OverridePin: opts.L0Pin}
 }
 
+// TrustRoot is the pin a report's embedded-proof levels were verified against (Report.EmbeddedTrustRoot).
+type TrustRoot struct {
+	Network  string `json:"network"`  // the pin's network: "kermit", or "local-embedded" for a local run's own network
+	Pin      string `json:"pin"`      // the pin's ID (its incarnation)
+	Supplied bool   `json:"supplied"` // the relying party passed the pin explicitly (Options.L0Pin); false for a compiled pin
+}
+
+// trustRootOf is the pin the verifier judged embedded proofs against: the relying party's when supplied, otherwise the compiled pin of the
+// named network (nil when there is none, in which case no embedded proof can have been credited).
+func trustRootOf(opts Options) *TrustRoot {
+	if opts.L0Pin != nil {
+		return &TrustRoot{Network: opts.L0Pin.Network, Pin: opts.L0Pin.ID(), Supplied: true}
+	}
+	pin, err := l0proof.CompiledPin(l0Opts(opts).Network)
+	if err != nil {
+		return nil
+	}
+	return &TrustRoot{Network: pin.Network, Pin: pin.ID()}
+}
+
 // PinFlagHint is how a relying party passes a pin the verifier does not compile in (brief 28bl row 1): a local run writes its network's pin next
 // to its bundle, and the verifier takes it only when the relying party passes it explicitly.
 const PinFlagHint = "pass that network's pin explicitly (infrix verify --l0-pin <pin file>; a local run writes pin.local-embedded.json next to its bundle)"

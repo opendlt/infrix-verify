@@ -97,6 +97,10 @@ type Report struct {
 	// LevelSourceEmbeddedProof or LevelSourceLiveQuery, never a field the node set (native proof plan section 2, brief 28bj row 2). A level
 	// the verifier did not witness is not listed; nil when nothing is credited.
 	LevelSources map[string]string `json:"levelSources,omitempty"`
+	// EmbeddedTrustRoot names the pin every embedded-proof level (L4, G1, G2 sourced embedded-proof) was verified against: the pin's network
+	// and ID, and whether the relying party supplied it (brief 28bl row 1). A level verified under a local run's pin is relative to that
+	// run's own network ("local-embedded"), never Kermit, and a surface must say so. Nil when no level is sourced embedded-proof.
+	EmbeddedTrustRoot *TrustRoot `json:"embeddedTrustRoot,omitempty"`
 	// GovernanceBinding records how the approvals behind G1 or G2 are bound to the key page (empty below G1):
 	//   - GovernanceBindingVersion ("version-bound (off-chain)") at G1: each approval's key is proven on its page at EXACTLY the page version its
 	//     signature claims. That proves "a key that was on the page at version V signed"; it cannot exclude a key removed later signing while
@@ -416,6 +420,12 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 		policyAllowed: policyAllowed, approvalsProven: approvalsSigned && keyPagesProven, governanceExecuted: governanceExecuted,
 		externalProofs: len(bundle.ExternalProofs) > 0, externalEmbedded: externalEmbedded,
 	})
+	for _, src := range report.LevelSources {
+		if src == LevelSourceEmbeddedProof {
+			report.EmbeddedTrustRoot = trustRootOf(opts)
+			break
+		}
+	}
 
 	// Derived layered-verification flags (mirror the Nexus inspector).
 	report.L0Verified = l0Confirmed || l0Embedded

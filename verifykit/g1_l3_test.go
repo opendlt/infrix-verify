@@ -183,8 +183,13 @@ func TestATamperedApprovalSignatureOrBindingCapsAtG0AndFails(t *testing.T) {
 		a := signedApproval(t, c.scheme, planHashVK())
 		c.f(&a)
 		r := verifyWithApprovals(t, false, a)
-		if r.GovernanceLevel != "G0" || r.Verified || checkStatus(r, "approval_signatures") != CheckFail {
-			t.Errorf("%s: governance %s verified %v approval_signatures %s; want G0, not verified, a fail", name, r.GovernanceLevel, r.Verified, checkStatus(r, "approval_signatures"))
+		want := "G0"
+		if name == "stated plan" {
+			// the stated plan no longer binds the package's plan hash: integrity fails, so no level at all (PV-INT-01)
+			want = "ungoverned"
+		}
+		if r.GovernanceLevel != want || r.Verified || checkStatus(r, "approval_signatures") != CheckFail {
+			t.Errorf("%s: governance %s verified %v approval_signatures %s; want %s, not verified, a fail", name, r.GovernanceLevel, r.Verified, checkStatus(r, "approval_signatures"), want)
 		}
 	}
 	// a real signature over a preimage for ANOTHER plan, stated honestly, is a signature for the wrong plan: refused

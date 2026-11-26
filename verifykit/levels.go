@@ -11,31 +11,31 @@ import (
 	"github.com/opendlt/infrix-schema/evidence"
 )
 
-// computeProofLevel maps the verified anchor state onto the canonical
-// proof ladder. The portable bundle carries L0-settlement evidence (an
-// anchored batch + the L0 tx); storage/account inclusion (L1/L2) require
-// state proofs that are not part of a portable evidence package, so the
-// kit reports the HIGHEST layer it can independently witness:
+// computeProofLevel maps what this verifier proved onto the canonical proof ladder (infrix-schema assurance). Integrity (the export hash,
+// the plan binding, the evidence chain, the outcome digest) is a precondition of every level, not a level. The kit reports the HIGHEST
+// rung it independently witnessed:
 //
-//   - L4 (L0 settlement): the bundle is anchored AND the anchor tx was
-//     independently confirmed on live L0.
-//   - L3 (batch inclusion): the bundle is anchored: the bundle hash this
-//     verifier recomputes is proven by Merkle inclusion into the batch root
-//     the anchor record names (checkAnchorProof). The node-set anchorStatus
-//     field is never read for it (brief 28bd row 2, L2992).
-//   - L0 (none): the bundle is not anchored.
+//   - L4 (L0 settlement): the bundle is anchored AND the anchor tx was independently confirmed on L0.
+//   - L3 (batch inclusion): the bundle hash this verifier recomputes is proven by Merkle inclusion into the batch root the anchor record
+//     names (checkAnchorProof). The node-set anchorStatus field is never read for it (brief 28bd row 2, L2992).
+//   - L2 (account inclusion): every claimed storage key is proven in its contract root AND that contract root is proven to be the
+//     contract's leaf in the bundle's state root, the root BundleHash commits to (checkStateInclusion, brief 28bd phase 2b).
+//   - L1 (storage inclusion): every claimed storage key is proven in its contract root.
+//   - L0 (none): nothing above.
 //
-// The source of an L4 is recorded beside the level. Today's only L4 route is
-// a live L0 query; the documented rule is that offline verification can claim
-// L4 only from an embedded, pinned, fully verified proof chain, and never from
-// node output (operator decision 2026-11-26, L2992). Without either the kit
-// will not claim L4 even for an anchored bundle.
-func computeProofLevel(anchored, l0Confirmed bool) assurance.ProofLevel {
+// The source of an L4 is recorded beside the level (Report.ProofLevelSource). Today's only L4 route is a live L0 query; the documented
+// rule is that offline verification can claim L4 only from an embedded, pinned, fully verified proof chain, and never from node output
+// (operator decision 2026-11-26, L2992).
+func computeProofLevel(storage, account, anchored, l0Confirmed bool) assurance.ProofLevel {
 	switch {
 	case anchored && l0Confirmed:
 		return assurance.ProofLevelL0Settlement
 	case anchored:
 		return assurance.ProofLevelBatchInclusion
+	case storage && account:
+		return assurance.ProofLevelAccountInclusion
+	case storage:
+		return assurance.ProofLevelStorageInclusion
 	default:
 		return assurance.ProofLevelNone
 	}

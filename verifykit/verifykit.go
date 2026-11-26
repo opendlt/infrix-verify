@@ -304,6 +304,9 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	// (brief 28bd row 2). The node-set anchorStatus field is never read for it.
 	anchored := report.checkAnchorProof(pkg, &bundle, bundleParsed)
 
+	// L1/L2: the claimed keys in their contract roots and the contract roots in the bundle's state root, recomputed (brief 28bd phase 2b).
+	stateProven := report.checkStateInclusion(&bundle, bundleParsed)
+
 	// 9-11. Live L0 confirmation — fetch the anchor tx directly from L0.
 	l0Confirmed := report.checkL0Anchor(ctx, &bundle, anchored, opts.L0Confirmer)
 	externalProofConfirmed := report.checkExternalProof(ctx, &bundle, opts.ExternalProofConfirmer)
@@ -338,8 +341,13 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	})
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
-	proof := computeProofLevel(anchored, l0Confirmed)
+	proof := computeProofLevel(stateProven.Storage, stateProven.Account, anchored, l0Confirmed)
 	gov := computeGovernanceLevel(&bundle, bundleParsed, approvalsSigned, externalProofConfirmed, anchored)
+	// Integrity is a precondition of every level, not a level (native proof plan PV-INT-01): a package whose export hash, plan binding,
+	// evidence chain or outcome digest does not recompute proves nothing, whatever else it carries.
+	if !report.integrityHolds() {
+		proof, gov = assurance.ProofLevelNone, assurance.GovernanceLevelUngoverned
+	}
 	report.finalizeLevels(proof, gov, opts.Require)
 	if proof == assurance.ProofLevelL0Settlement {
 		report.ProofLevelSource = ProofSourceLiveQuery
@@ -383,6 +391,28 @@ func (r *Report) applyReplayChecks(requireReplay bool) {
 			r.add("replay", CheckSkip, res.Detail)
 		}
 	}
+}
+
+// integrityChecks are the bindings every level presupposes.
+var integrityChecks = []string{"cryptographic_offline", "bundle_parse", "plan_hash_binding", "outcome_digest_binding", "evidence_chain"}
+
+// integrityHolds reports whether every integrity check ran and passed.
+func (r *Report) integrityHolds() bool {
+	for _, name := range integrityChecks {
+		passed := false
+		for _, c := range r.Checks {
+			if c.Name == name {
+				if c.Status != CheckPass {
+					return false
+				}
+				passed = true
+			}
+		}
+		if !passed {
+			return false
+		}
+	}
+	return true
 }
 
 // add appends a check.
@@ -544,6 +574,28 @@ func (r *Report) checkAnchorProof(pkg *evidence.PortableEvidencePackage, bundle 
 	r.add("anchor_proof", CheckPass, fmt.Sprintf("bundle hash proven at leaf %d of the %d-leaf batch root %x",
 		bundle.AnchorInclusion.LeafIndex, bundle.AnchorInclusion.LeafCount, bundle.AnchorInclusion.BatchRoot))
 	return true
+}
+
+// checkStateInclusion adds the state_inclusion check: a SKIP for a bundle that claims no state, a FAIL (and no L1/L2) for a state proof that does
+// not verify, and a PASS naming the rung reached.
+func (r *Report) checkStateInclusion(bundle *evidence.EvidenceBundle, parsed bool) stateVerdict {
+	if !parsed {
+		r.add("state_inclusion", CheckSkip, "bundle did not parse")
+		return stateVerdict{}
+	}
+	v := checkStateProofs(bundle)
+	switch {
+	case v.Failure != "":
+		r.add("state_inclusion", CheckFail, v.Failure)
+		return stateVerdict{}
+	case v.Account:
+		r.add("state_inclusion", CheckPass, fmt.Sprintf("%d key(s) proven in their contract roots, and the contract roots in the bundle's state root (L2)", len(bundle.StorageProofs)))
+	case v.Storage:
+		r.add("state_inclusion", CheckPass, fmt.Sprintf("%d key(s) proven in their contract roots; no contract root is tied to the state root (L1)", len(bundle.StorageProofs)))
+	default:
+		r.add("state_inclusion", CheckSkip, "the bundle claims no contract state")
+	}
+	return v
 }
 
 // checkApprovalSignatures adds the approval_signatures check and returns whether every approval in the bundle carries a signature

@@ -302,16 +302,16 @@ func TestTheEmbeddedProofsUseTheVerifiersPinNeverTheBundles(t *testing.T) {
 func TestG2NeedsTheReferencedCredentialConfirmed(t *testing.T) {
 	b := &evidence.EvidenceBundle{PolicyDecisions: []evidence.DecisionProofRef{{Decision: "allow"}},
 		ExternalProofs: []evidence.ExternalProofRef{{SourceChain: "acc", ProofType: "vc", Verified: true}}}
-	if g := computeGovernanceLevel(b, true, true, true, false, true); g.String() != "G1" {
+	if g := computeGovernanceLevel(b, true, true, true, true, false, true); g.String() != "G1" {
 		t.Fatalf("an unconfirmed credential reached %s", g)
 	}
-	if g := computeGovernanceLevel(b, true, true, true, true, true); g.String() != "G2" {
+	if g := computeGovernanceLevel(b, true, true, true, true, true, true); g.String() != "G2" {
 		t.Fatalf("a confirmed credential with every other G2 condition: %s", g)
 	}
-	if g := computeGovernanceLevel(b, true, true, false, true, true); g.String() != "G1" {
+	if g := computeGovernanceLevel(b, true, true, true, false, true, true); g.String() != "G1" {
 		t.Fatalf("a confirmed credential without an Accumulate-executed approval reached %s", g)
 	}
-	if g := computeGovernanceLevel(b, true, true, true, true, false); g.String() != "G1" {
+	if g := computeGovernanceLevel(b, true, true, true, true, true, false); g.String() != "G1" {
 		t.Fatalf("an unanchored bundle reached %s", g)
 	}
 }

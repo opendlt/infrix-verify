@@ -79,6 +79,7 @@ func buildPortableWith(t *testing.T, anchored bool, stateRoot [32]byte, outcomeI
 		StateRoot:         stateRoot,
 		OutcomeID:         outcomeID,
 		PolicyDecisions:   []evidence.DecisionProofRef{{PolicyType: "transfer", RuleID: "allow", Decision: "allow", BlockHeight: 1}},
+		PolicyEvaluations: []evidence.PolicyEvaluation{transferEvaluation(t, transferPolicy(), 50)},
 		ApprovalEvidence:  []evidence.ApprovalEvidenceRef{signedApproval(t, evidence.ApprovalSigTypeInfrixEd25519, planHash)},
 		ExternalProofs:    []evidence.ExternalProofRef{{SourceChain: "acc", ProofType: "groth16", Verified: true}},
 		OutcomeDigest:     outcomeDigest,

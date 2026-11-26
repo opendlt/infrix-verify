@@ -93,8 +93,8 @@ type Report struct {
 	// chain, never from node output.
 	ProofLevelSource string `json:"proofLevelSource,omitempty"`
 	// LevelSources names, for EVERY level the report credits ("L1".."L4", "G0".."G2"), where the verifier got it: LevelSourceRecomputed,
-	// LevelSourceEmbeddedProof, LevelSourceLiveQuery, or LevelSourceRecorded for a level resting on a decision the bundle records (native
-	// proof plan section 2, brief 28bj row 2). A level the verifier did not witness is not listed; nil when nothing is credited.
+	// LevelSourceEmbeddedProof or LevelSourceLiveQuery, never a field the node set (native proof plan section 2, brief 28bj row 2). A level
+	// the verifier did not witness is not listed; nil when nothing is credited.
 	LevelSources map[string]string `json:"levelSources,omitempty"`
 	// GovernanceBinding records how the approvals behind G1 or G2 are bound to the key page (empty below G1):
 	//   - GovernanceBindingVersion ("version-bound (off-chain)") at G1: each approval's key is proven on its page at EXACTLY the page version its
@@ -132,6 +132,10 @@ type Report struct {
 	// WitnessOperatorThresholdMet is true when it meets RequireWitnessOperators.
 	WitnessOperatorCount        int  `json:"witnessOperatorCount"`
 	WitnessOperatorThresholdMet bool `json:"witnessOperatorThresholdMet"`
+
+	// PolicyReevaluations records each content-addressed policy this verifier re-ran for G0 (brief 28bi): its recomputed hash, what the
+	// verifier's own evaluation decided, and whether the relying party pinned it.
+	PolicyReevaluations []PolicyReevaluation `json:"policyReevaluations,omitempty"`
 
 	Checks []Check       `json:"checks"`
 	Replay *ReplayResult `json:"replay,omitempty"`
@@ -207,6 +211,11 @@ type Options struct {
 	// means external proofs are not independently confirmed and governance caps
 	// at G1.
 	ExternalProofConfirmer ExternalProofConfirmer
+
+	// PinnedPolicies is the relying party's policy registry: policy type -> the content hash it accepts (brief 28bi). When non-nil, every
+	// re-evaluated policy of a pinned type must have the pinned hash (else the policy_reevaluation check fails) and every pinned type must be
+	// present (else G0 is not credited). Nil means no registry is pinned: the re-evaluated hashes are reported for the relying party.
+	PinnedPolicies map[string][32]byte
 
 	// Require, when non-nil, gates Verified on the achieved levels.
 	Require *RequiredLevel
@@ -328,6 +337,10 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	// G1 is credited from approvals whose signatures this verifier checks itself (brief 28bd row 1), never from an identity string.
 	approvalsSigned := report.checkApprovalSignatures(pkg, &bundle, bundleParsed)
 
+	// G0 is credited from this verifier's own re-evaluation of the bundle's content-addressed policies, never from a recorded decision
+	// (brief 28bi, native proof plan phase 6).
+	policyAllowed := report.checkPolicyReevaluation(&bundle, bundleParsed, opts.PinnedPolicies)
+
 	// "Anchored" is the Merkle inclusion of the bundle hash THIS verifier recomputes into the batch root the anchor record names
 	// (brief 28bd row 2). The node-set anchorStatus field is never read for it.
 	anchored := report.checkAnchorProof(pkg, &bundle, bundleParsed)
@@ -376,7 +389,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
 	proof := computeProofLevel(stateProven.Storage, stateProven.Account, anchored, l0Confirmed || l0Embedded)
-	gov := computeGovernanceLevel(&bundle, bundleParsed, approvalsSigned && keyPagesProven, governanceExecuted, externalProofConfirmed, anchored)
+	gov := computeGovernanceLevel(&bundle, bundleParsed, policyAllowed, approvalsSigned && keyPagesProven, governanceExecuted, externalProofConfirmed, anchored)
 	// Integrity is a precondition of every level, not a level (native proof plan PV-INT-01): a package whose export hash, plan binding,
 	// evidence chain or outcome digest does not recompute proves nothing, whatever else it carries.
 	if !report.integrityHolds() {
@@ -399,7 +412,8 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	}
 	report.LevelSources = levelSources(proof, gov, levelWitness{
 		storage: stateProven.Storage, account: stateProven.Account, anchored: anchored, l4Source: report.ProofLevelSource,
-		approvalsSigned: approvalsSigned, externalProofConfirmed: externalProofConfirmed,
+		policyAllowed: policyAllowed, approvalsProven: approvalsSigned && keyPagesProven, governanceExecuted: governanceExecuted,
+		externalProofs: len(bundle.ExternalProofs) > 0,
 	})
 
 	// Derived layered-verification flags (mirror the Nexus inspector).

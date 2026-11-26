@@ -173,6 +173,7 @@ func TestAccumulateBundleProofs(t *testing.T) {
 		"source":  "the in-process Accumulate simulator (gitlab.com/Jason_Gregoire/accumulate test/simulator), one BVN: the target bundle's batch root written as the single data item of a WriteData, and the M-of-N approval of its plan for its bundle executed under a 2-of-3 page captured at the executing block; Directory headers synthesized over the real Directory BPT roots and signed by validator keys derived from the label infrix-vk-simulator",
 		"label":   "SIMULATOR fixture: verified only against its own pin passed explicitly; never a Kermit claim",
 		"command": "cd l0proofref && GOVPROOF_WRITE_FIXTURES=1 go test -count=1 -run TestAccumulateBundleProofs .",
+		"target":  "step 1, before this one: VERIFYKIT_WRITE_ACC_TARGET=1 go test -count=1 -run TestAccumulateFixtureTarget ./verifykit writes bundle.json and target.json; the bundle carries the content-addressed policies (PolicyEvaluations) whose re-evaluation allows, so the cumulative ladder's G0 holds under its G1 and G2 (brief 28bj, main ruling 2026-11-26)",
 	}}
 	b, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {

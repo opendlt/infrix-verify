@@ -43,7 +43,9 @@ func computeProofLevel(storage, account, anchored, l0Confirmed bool) assurance.P
 
 // computeGovernanceLevel classifies how strongly the operation was governed (native proof plan section 3):
 //
-//   - G0 (policy passed): the bundle records at least one policy decision and none of them denied.
+//   - G0 (policy passed): `policyAllowed`: this verifier re-ran every content-addressed policy the bundle says its plan was decided under, with the
+//     node's own evaluator body, and every one allows (checkPolicyReevaluation, brief 28bi). A recorded decision is never credited; a recorded denial
+//     still makes the bundle ungoverned. The ladder is cumulative: G1 needs G0, G2 needs G1 (main ruling 2026-11-26).
 //   - G1 (threshold approved): G0 plus `approvalsProven`: every approval's signature verified by this verifier over the package's plan hash under its
 //     declared scheme (checkApprovalSignatures, brief 28bd row 1) AND every approver key proven on the key page its preimage names, at the page version it
 //     signed against, with each page's threshold computed from the PROVEN page (checkApprovalKeyPages, brief 28bh). An identity string, an unsigned
@@ -53,19 +55,16 @@ func computeProofLevel(storage, account, anchored, l0Confirmed bool) assurance.P
 //     plus, when the bundle references an external or credential proof, that proof INDEPENDENTLY confirmed (an injected ExternalProofConfirmer). A node-set
 //     outcome, an ExternalProofRef.Verified flag (DX P0-5b) or a recorded success is never read (NL-06).
 //   - ungoverned: anything less.
-func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed, approvalsProven, governanceExecuted, externalProofConfirmed, anchored bool) assurance.GovernanceLevel {
+func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed, policyAllowed, approvalsProven, governanceExecuted, externalProofConfirmed, anchored bool) assurance.GovernanceLevel {
 	if !parsed {
 		return assurance.GovernanceLevelUngoverned
 	}
-
-	policyAllowed := false
 	for _, d := range bundle.PolicyDecisions {
 		if isDeny(d.Decision) {
 			// A recorded denial means the operation was not cleanly
 			// governed-and-allowed; do not credit G0.
 			return assurance.GovernanceLevelUngoverned
 		}
-		policyAllowed = true
 	}
 	if !policyAllowed {
 		return assurance.GovernanceLevelUngoverned

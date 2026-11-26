@@ -78,7 +78,7 @@
           0,
           0
         ],
-        "timestamp": "2026-11-26T08:10:43.5164763-05:00"
+        "timestamp": "2026-11-26T09:27:07.7678445-05:00"
       },
       {
         "sequence": 2,
@@ -151,7 +151,7 @@
           18,
           4
         ],
-        "timestamp": "2026-11-26T08:10:43.5164763-05:00",
+        "timestamp": "2026-11-26T09:27:07.7678445-05:00",
         "artifactRef": "plan-vk"
       },
       {
@@ -225,7 +225,7 @@
           188,
           189
         ],
-        "timestamp": "2026-11-26T08:10:43.5164763-05:00",
+        "timestamp": "2026-11-26T09:27:07.7678445-05:00",
         "artifactRef": "outcome-vk"
       }
     ],
@@ -297,7 +297,7 @@
       11,
       110
     ],
-    "createdAt": "2026-11-26T08:10:43.5164763-05:00"
+    "createdAt": "2026-11-26T09:27:07.7678445-05:00"
   },
   "stateRoot": [
     7,
@@ -338,38 +338,38 @@
   "anchorBlockHeight": 4242,
   "anchorInclusion": {
     "batchRoot": [
-      185,
-      118,
-      134,
-      167,
-      34,
-      225,
-      205,
-      199,
-      93,
-      115,
-      128,
-      248,
-      210,
-      95,
-      8,
-      203,
-      171,
-      23,
-      92,
-      154,
-      150,
-      14,
-      200,
-      33,
-      233,
+      66,
+      202,
+      218,
       247,
-      26,
-      118,
-      136,
+      212,
+      176,
+      97,
+      135,
+      194,
       16,
-      25,
-      219
+      237,
+      241,
+      23,
+      161,
+      116,
+      123,
+      31,
+      75,
+      118,
+      201,
+      29,
+      54,
+      62,
+      9,
+      232,
+      103,
+      169,
+      180,
+      69,
+      243,
+      250,
+      108
     ],
     "leafIndex": 1,
     "leafCount": 3,
@@ -490,6 +490,55 @@
       "blockHeight": 1
     }
   ],
+  "policyEvaluations": [
+    {
+      "policyType": "transfer",
+      "scopeKey": "global",
+      "policy": {
+        "hash": [
+          239,
+          235,
+          243,
+          160,
+          173,
+          66,
+          98,
+          185,
+          150,
+          20,
+          57,
+          114,
+          246,
+          89,
+          101,
+          227,
+          203,
+          202,
+          124,
+          38,
+          134,
+          205,
+          10,
+          64,
+          35,
+          2,
+          214,
+          224,
+          118,
+          243,
+          21,
+          38
+        ],
+        "content": "eyJpZCI6InRyYW5zZmVyLWNhcCIsIm5hbWUiOiJ0cmFuc2ZlciBjYXAiLCJ0eXBlIjoidHJhbnNmZXIiLCJ2ZXJzaW9uIjoxLCJkZWZhdWx0RWZmZWN0IjoiZGVueSIsInJ1bGVzIjpbeyJpZCI6ImNhcCIsInByaW9yaXR5IjoxMCwiY29uZGl0aW9uIjoic2NvcGU6OmFtb3VudCgpIFx1MDAzZSAxMDAwIiwiZWZmZWN0IjoiZGVueSIsImF1ZGl0TXNnIjoib3ZlciB0aGUgY2FwIiwiZW5hYmxlZCI6dHJ1ZX0seyJpZCI6ImFsbG93IiwicHJpb3JpdHkiOjEwMCwiY29uZGl0aW9uIjoiYWN0b3I6OmlkZW50aXR5KCkgIT0gXCJcIiIsImVmZmVjdCI6ImFsbG93IiwiYXVkaXRNc2ciOiJpZGVudGlmaWVkIGFjdG9yIiwiZW5hYmxlZCI6dHJ1ZX1dfQ=="
+      },
+      "subject": {
+        "actor": "acc://alice.acme",
+        "function": "transfer",
+        "blockHeight": 1,
+        "amount": 50
+      }
+    }
+  ],
   "approvalEvidence": [
     {
       "stageId": "s1",
@@ -586,38 +635,38 @@
   ],
   "anchorRecordId": "anchor-rec-vk",
   "bundleHash": [
-    64,
-    12,
-    154,
-    32,
-    180,
-    5,
-    96,
-    46,
-    244,
-    227,
-    108,
-    62,
-    66,
-    254,
-    225,
+    185,
+    17,
+    58,
+    91,
+    2,
+    146,
+    76,
+    63,
+    201,
+    122,
+    205,
+    181,
+    3,
+    191,
+    219,
     221,
-    254,
-    29,
-    115,
-    36,
-    64,
-    149,
-    152,
-    199,
-    13,
-    84,
-    209,
-    103,
-    39,
-    38,
+    211,
     62,
-    240
+    60,
+    89,
+    34,
+    94,
+    193,
+    201,
+    79,
+    183,
+    101,
+    22,
+    65,
+    200,
+    120,
+    62
   ],
   "chainVerified": true,
   "outcomeDigest": [
@@ -656,6 +705,6 @@
   ],
   "sealedBlockHeight": 100,
   "state": "created",
-  "createdAt": "2026-11-26T08:10:43.5185135-05:00",
-  "updatedAt": "2026-11-26T08:10:43.5185135-05:00"
+  "createdAt": "2026-11-26T09:27:07.7688808-05:00",
+  "updatedAt": "2026-11-26T09:27:07.7688808-05:00"
 }

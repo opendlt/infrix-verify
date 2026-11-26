@@ -85,6 +85,10 @@ type Report struct {
 	// L4. Operator decision 2026-11-26 (L2992): offline verification may claim L4 only from an embedded, pinned, fully verified proof
 	// chain, never from node output.
 	ProofLevelSource string `json:"proofLevelSource,omitempty"`
+	// LevelSources names, for EVERY level the report credits ("L1".."L4", "G0".."G2"), where the verifier got it: LevelSourceRecomputed,
+	// LevelSourceEmbeddedProof, LevelSourceLiveQuery, or LevelSourceRecorded for a level resting on a decision the bundle records (native
+	// proof plan section 2, brief 28bj row 2). A level the verifier did not witness is not listed; nil when nothing is credited.
+	LevelSources map[string]string `json:"levelSources,omitempty"`
 
 	// platform-review-3 Epic 2: the layered verification truth, identical
 	// to the fields the Nexus proof inspector surfaces. CryptographicallyVerified
@@ -352,6 +356,10 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	if proof == assurance.ProofLevelL0Settlement {
 		report.ProofLevelSource = ProofSourceLiveQuery
 	}
+	report.LevelSources = levelSources(proof, gov, levelWitness{
+		storage: stateProven.Storage, account: stateProven.Account, anchored: anchored, l4Source: report.ProofLevelSource,
+		approvalsSigned: approvalsSigned, externalProofConfirmed: externalProofConfirmed,
+	})
 
 	// Derived layered-verification flags (mirror the Nexus inspector).
 	report.L0Verified = l0Confirmed

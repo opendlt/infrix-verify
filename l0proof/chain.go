@@ -143,7 +143,7 @@ func Verify(c *L0ProofChain, exp Expectation, opts Options) Result {
 	}
 
 	// the value is a data item of the transaction, which went to the anchor account
-	txHash, principal, err := c.Transaction.hash(&lim)
+	txHash, principal, err := c.Transaction.Hash(&lim)
 	if err != nil {
 		return fail(res, "transaction: %v", err)
 	}
@@ -198,12 +198,15 @@ func Verify(c *L0ProofChain, exp Expectation, opts Options) Result {
 	return res
 }
 
-// hash recomputes the transaction hash (protocol/transaction_hash.go calcHash and hashWriteData, protocol/data_entry.go DoubleHashDataEntry.Hash):
+// Hash recomputes the transaction hash and reads its principal (protocol/transaction_hash.go calcHash and hashWriteData, protocol/data_entry.go DoubleHashDataEntry.Hash):
 //
 //	entry hash = SHA-256( MerkleRoot( SHA-256(item) for each item ) )
 //	body hash  = MerkleRoot( SHA-256(body without entry), entry hash )
 //	tx hash    = SHA-256( SHA-256(header) ‖ body hash )
-func (t *WriteDataTx) hash(lim *Limits) ([]byte, string, error) {
+func (t *WriteDataTx) Hash(lim *Limits) ([]byte, string, error) {
+	if lim == nil {
+		lim = &DefaultLimits
+	}
 	if len(t.Header)+len(t.Body) > lim.MaxTransactionBytes {
 		return nil, "", fmt.Errorf("the header and body are %d bytes, over the limit of %d", len(t.Header)+len(t.Body), lim.MaxTransactionBytes)
 	}

@@ -34,6 +34,10 @@ func (r *reader) uvarint(what string) (uint64, error) {
 	if n <= 0 {
 		return 0, fmt.Errorf("%s: malformed varint at byte %d", what, r.off)
 	}
+	// Accumulate writes minimal varints (binary.PutUvarint); a padded one is not an encoding Accumulate produced, so it is refused
+	if n != len(binary.AppendUvarint(nil, v)) {
+		return 0, fmt.Errorf("%s: non-minimal varint at byte %d", what, r.off)
+	}
 	r.off += n
 	return v, nil
 }

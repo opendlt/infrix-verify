@@ -36,6 +36,12 @@ const (
 	ProofSourceEmbeddedProof = "embedded-proof"
 )
 
+// The bindings governance can rest on (Report.GovernanceBinding).
+const (
+	GovernanceBindingVersion  = "version-bound (off-chain)"
+	GovernanceBindingExecuted = "accumulate-executed"
+)
+
 // CheckStatus is the per-check outcome.
 type CheckStatus string
 
@@ -86,6 +92,13 @@ type Report struct {
 	// L4. Operator decision 2026-11-26 (L2992): offline verification may claim L4 only from an embedded, pinned, fully verified proof
 	// chain, never from node output.
 	ProofLevelSource string `json:"proofLevelSource,omitempty"`
+	// GovernanceBinding records how the approvals behind G1 or G2 are bound to the key page (empty below G1):
+	//   - GovernanceBindingVersion ("version-bound (off-chain)") at G1: each approval's key is proven on its page at EXACTLY the page version its
+	//     signature claims. That proves "a key that was on the page at version V signed"; it cannot exclude a key removed later signing while
+	//     claiming the old version (backdating).
+	//   - GovernanceBindingExecuted ("accumulate-executed") at G2: Accumulate executed the approval under its own sequence and version rules at a
+	//     proven block, which excludes backdating; that is why G2 is the higher level (main ruling 2026-11-26).
+	GovernanceBinding string `json:"governanceBinding,omitempty"`
 
 	// platform-review-3 Epic 2: the layered verification truth, identical
 	// to the fields the Nexus proof inspector surfaces. CryptographicallyVerified
@@ -366,6 +379,12 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 		proof, gov = assurance.ProofLevelNone, assurance.GovernanceLevelUngoverned
 	}
 	report.finalizeLevels(proof, gov, opts.Require)
+	switch gov {
+	case assurance.GovernanceLevelThresholdApproved:
+		report.GovernanceBinding = GovernanceBindingVersion
+	case assurance.GovernanceLevelCredentialedAnchored:
+		report.GovernanceBinding = GovernanceBindingExecuted
+	}
 	if proof == assurance.ProofLevelL0Settlement {
 		// an embedded, pinned, fully verified chain is the offline source; a live query alone is the other
 		if l0Embedded {

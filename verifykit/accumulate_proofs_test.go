@@ -220,7 +220,7 @@ func detail(r *Report, name string) string {
 // are proven on their page (G1), and the Accumulate-executed approval reaches G2.
 func TestAccumulateProvenBundleReachesL4G2Offline(t *testing.T) {
 	r := Verify(context.Background(), accPackage(t, nil), accOpts(t))
-	if !r.Verified || r.ProofLevel != "L4" || r.GovernanceLevel != "G2" || r.ProofLevelSource != ProofSourceEmbeddedProof {
+	if !r.Verified || r.ProofLevel != "L4" || r.GovernanceLevel != "G2" || r.ProofLevelSource != ProofSourceEmbeddedProof || r.GovernanceBinding != GovernanceBindingExecuted {
 		t.Fatalf("verified=%v %s/%s source=%q: %+v", r.Verified, r.ProofLevel, r.GovernanceLevel, r.ProofLevelSource, r.Checks)
 	}
 	for _, c := range []string{"embedded_l0_proof", "approval_key_pages", "governance_execution"} {
@@ -235,7 +235,7 @@ func TestWithoutAnAccumulateTransactionTheBundleIsExactlyL3G1(t *testing.T) {
 	r := Verify(context.Background(), accPackage(t, func(b *evidence.EvidenceBundle, _ *accProofs) {
 		b.L0Proof, b.GovernanceExecution = nil, nil
 	}), accOpts(t))
-	if !r.Verified || r.ProofLevel != "L3" || r.GovernanceLevel != "G1" || r.ProofLevelSource != "" {
+	if !r.Verified || r.ProofLevel != "L3" || r.GovernanceLevel != "G1" || r.ProofLevelSource != "" || r.GovernanceBinding != GovernanceBindingVersion {
 		t.Fatalf("verified=%v %s/%s source=%q: %+v", r.Verified, r.ProofLevel, r.GovernanceLevel, r.ProofLevelSource, r.Checks)
 	}
 }
@@ -337,9 +337,12 @@ func TestApprovalKeyPagesRefuseEveryMismatch(t *testing.T) {
 		mutate func(b *evidence.EvidenceBundle)
 		want   string
 	}{
-		"another page version": {func(b *evidence.EvidenceBundle) {
+		"page version + 1": {func(b *evidence.EvidenceBundle) {
 			b.ApprovalEvidence[1] = accApprovalBy(t, accSeeds[1], 2, 1, planHashVK())
 		}, "signed against version 2"},
+		"page version - 1": {func(b *evidence.EvidenceBundle) {
+			b.ApprovalEvidence[1] = accApprovalBy(t, accSeeds[1], 0, 1, planHashVK())
+		}, "signed against version 0"},
 		"a key not on the page": {func(b *evidence.EvidenceBundle) {
 			b.ApprovalEvidence[1] = accApprovalBy(t, bytes.Repeat([]byte{0x77}, 32), 1, 1, planHashVK())
 		}, "is not on the proven page"},

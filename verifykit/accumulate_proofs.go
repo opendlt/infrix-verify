@@ -134,6 +134,8 @@ func (r *Report) checkApprovalKeyPages(bundle *evidence.EvidenceBundle, approval
 			return false
 		}
 		if pre.SignerVersion != page.Page.Version {
+			// credit only the page proven at EXACTLY the version the signature claims: the version changes on every key change, so that state pins the
+			// exact key set the signature claims (main ruling 2026-11-26)
 			r.add(name, CheckFail, fmt.Sprintf("approval %d signed against version %d of %s; the proven page is at version %d", i, pre.SignerVersion, page.Page.URL, page.Page.Version))
 			return false
 		}
@@ -165,7 +167,7 @@ func (r *Report) checkApprovalKeyPages(bundle *evidence.EvidenceBundle, approval
 		r.add(name, CheckFail, "the bundle embeds a key-page proof for a page no approval names")
 		return false
 	}
-	r.add(name, CheckPass, "every approver key proven on its page at its signed version: "+strings.Join(met, "; "))
+	r.add(name, CheckPass, "version-bound (off-chain): every approver key proven on its page at exactly its signed version (a key removed later and backdating its version is not excluded; only an Accumulate-executed approval excludes that): "+strings.Join(met, "; "))
 	return true
 }
 

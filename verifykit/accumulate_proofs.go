@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/opendlt/infrix-schema/evidence"
 	"github.com/opendlt/infrix-verify/govproof"
@@ -36,7 +37,23 @@ func l0Opts(opts Options) l0proof.Options {
 	if network == "" {
 		network = l0proof.NetworkKermit
 	}
-	return l0proof.Options{Network: network, OverridePin: opts.L0Pin}
+	return l0proof.Options{Network: network, OverridePin: opts.L0Pin, Clock: opts.Clock}
+}
+
+// ClockReport is the relying party's clock as the verifier applied it to the embedded proofs (Report.Clock).
+type ClockReport struct {
+	Applied        bool   `json:"applied"`
+	Now            string `json:"now,omitempty"`            // RFC 3339, UTC
+	TrustingPeriod string `json:"trustingPeriod,omitempty"` // a Go duration
+	MaxClockDrift  string `json:"maxClockDrift,omitempty"`  // a Go duration
+}
+
+// clockReportOf is the clock report for the verified embedded anchor chain's result.
+func clockReportOf(res l0proof.Result) *ClockReport {
+	if !res.ClockApplied {
+		return &ClockReport{Applied: false}
+	}
+	return &ClockReport{Applied: true, Now: res.ClockNow.UTC().Format(time.RFC3339), TrustingPeriod: res.TrustingPeriod.String(), MaxClockDrift: res.MaxClockDrift.String()}
 }
 
 // TrustRoot is the pin a report's embedded-proof levels were verified against (Report.EmbeddedTrustRoot).
@@ -132,6 +149,7 @@ func (r *Report) checkEmbeddedL0Proof(bundle *evidence.EvidenceBundle, parsed, a
 	if res.PinOverridden {
 		pinNote = "relying-party pin"
 	}
+	r.Clock = clockReportOf(res)
 	// the full identifiers go under their labelled keys; the prose names each by its prefix (brief 28bs row 1)
 	r.addPublic(name, CheckPass, fmt.Sprintf("batch root %s anchored by tx %s, certified at Directory height %d (%s network %s, pin %s)", shortHex(root[:]),
 		shortHex(res.TxHash), res.DirectoryHeight, pinNote, res.Network, shortPinID(res.Pin)),

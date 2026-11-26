@@ -126,6 +126,10 @@ type Report struct {
 	// and ID, and whether the relying party supplied it (brief 28bl row 1). A level verified under a local run's pin is relative to that
 	// run's own network ("local-embedded"), never Kermit, and a surface must say so. Nil when no level is sourced embedded-proof.
 	EmbeddedTrustRoot *TrustRoot `json:"embeddedTrustRoot,omitempty"`
+	// Clock reports the relying party's clock over the embedded proofs (brief 28bs row 6 (d)): whether it was applied, the time it read, and
+	// the trusting period and drift bound it enforced. Nil when no level is sourced embedded-proof; Applied false when one is but no clock was
+	// passed (the verdict is clock-unchecked).
+	Clock *ClockReport `json:"clock,omitempty"`
 	// GovernanceBinding records how the approvals behind G1 or G2 are bound to the key page (empty below G1):
 	//   - GovernanceBindingVersion ("version-bound (off-chain)") at G1: each approval's key is proven on its page at EXACTLY the page version its
 	//     signature claims. That proves "a key that was on the page at version V signed"; it cannot exclude a key removed later signing while
@@ -309,6 +313,11 @@ type Options struct {
 	// simulator pin, an earlier Kermit incarnation); the report names it. Neither is ever read from the bundle (native proof plan PN-01).
 	L0Network string
 	L0Pin     *consensus.Pin
+	// Clock is the relying party's own clock (brief 28bs row 6 (d), L3008 (d)). When set, every embedded Accumulate proof (the anchor chain,
+	// the key-page proofs, the governance execution and the external-proof chains) is held to CometBFT's trusting-period and clock-drift
+	// checks against it, and the report records that it was applied (Report.Clock). Nil means no clock: those checks are not made and the
+	// report says the verdict is clock-unchecked. `infrix verify` passes the system time.
+	Clock *l0proof.RelyingPartyClock
 	// GovernanceAccount and GovernancePage are the app's governance data account and key page, named by the RELYING PARTY. G2 is credited only from an
 	// Accumulate-executed approval under exactly this page to exactly this account; with either empty, governance caps at G1.
 	GovernanceAccount string

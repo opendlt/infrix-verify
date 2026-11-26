@@ -1,0 +1,5 @@
+{
+  "command": "cd l0proofref \u0026\u0026 GOVPROOF_WRITE_FIXTURES=1 go test -count=1 -run TestSimulatorGovernanceFixture .",
+  "label": "SIMULATOR fixture: verified only against its own pin passed explicitly; never a Kermit claim",
+  "source": "the in-process Accumulate simulator (gitlab.com/Jason_Gregoire/accumulate test/simulator), one BVN: a 2-of-3 governance page, a multi-signature WriteData of infrix:approval:v1 || planHash || bundleID that the executor accepted, the page captured at the executing block; Directory headers synthesized over the real Directory BPT roots and signed by validator keys derived from the label govproof-simulator"
+}

@@ -35,7 +35,12 @@ type PolicyReevaluation struct {
 // the one the relying party pinned for its type. It is a SKIP that credits no G0, and fails nothing, when there is nothing to re-run, when
 // a recorded decision has no re-evaluable policy beside it (in order and by type), when a pinned type is missing, or when a policy reads an
 // operand the subject does not carry (the node's state is not provable offline).
-func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed bool, pins map[string][32]byte) bool {
+//
+// When approvals signed the plan (any approval carries a plan hash), every re-evaluated subject must be bound into the plan hash they signed
+// (brief 28bu row 2, the L3008 (b) ruling): planHash must equal evidence.BindPlanHash(bundle.PlanContentHash, the evaluations). A bundle
+// whose subjects are not bound is a SKIP that credits no G0 (an approved plan's subjects are node-asserted otherwise); a binding that does not
+// recompute FAILS (the subjects or the policies are not the ones the approvals signed).
+func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed bool, pins map[string][32]byte, planHash [32]byte) bool {
 	const name = "policy_reevaluation"
 	if !parsed {
 		r.add(name, CheckFail, "bundle did not parse")
@@ -118,7 +123,26 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 			return false
 		}
 	}
-	detail := fmt.Sprintf("%d content-addressed policies re-evaluated with the node's evaluator body; every one allows", len(evals))
+	approved := false
+	for _, ae := range bundle.ApprovalEvidence {
+		if ae.PlanHash != ([32]byte{}) {
+			approved = true
+			break
+		}
+	}
+	bound := ""
+	if approved {
+		if bundle.PlanContentHash == ([32]byte{}) {
+			r.add(name, CheckSkip, "approvals signed the plan, but the re-evaluated subjects are not bound into the plan hash they signed (the bundle carries no plan content hash); G0 is not credited")
+			return false
+		}
+		if got := evidence.BindPlanHash(bundle.PlanContentHash, evals); got != planHash {
+			r.add(name, CheckFail, fmt.Sprintf("the re-evaluated policies and subjects bind to plan hash %x, not the %x the approvals signed", got, planHash))
+			return false
+		}
+		bound = "; every subject is bound into the plan hash the approvals signed"
+	}
+	detail := fmt.Sprintf("%d content-addressed policies re-evaluated with the node's evaluator body; every one allows%s", len(evals), bound)
 	if pins == nil {
 		detail += " (no policy registry pinned: the hashes are reported for the relying party to compare)"
 	}

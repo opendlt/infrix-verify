@@ -60,7 +60,7 @@ func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID
 func buildPortableWith(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID string,
 	pre func(*evidence.EvidenceBundle), post func(*evidence.EvidenceBundle, *evidence.BuildPortablePackageInputs)) *evidence.PortableEvidencePackage {
 	t.Helper()
-	planHash := sha256.Sum256([]byte("vk-plan"))
+	planHash := planHashVK()
 	outcomeDigest := sha256.Sum256([]byte("vk-outcome-canonical"))
 
 	// Hash-linked evidence chain.
@@ -91,8 +91,19 @@ func buildPortableWith(t *testing.T, anchored bool, stateRoot [32]byte, outcomeI
 		bundle.AnchorBlock = 4242
 		bundle.AnchorRecordID = "anchor-rec-vk"
 	}
+	bundle.PlanContentHash = planContentVK()
 	if pre != nil {
 		pre(bundle)
+	}
+	// the plan the approvals signed binds the evaluations it was governed under (brief 28bu row 2): a pre that governs the plan under other
+	// evaluations is a node that planned under them, so the approvals signed over the default binding are re-signed over the new one
+	if bound := evidence.BindPlanHash(bundle.PlanContentHash, bundle.PolicyEvaluations); bound != planHash {
+		for i, ae := range bundle.ApprovalEvidence {
+			if ae.PlanHash == planHash && ae.SigType != "" {
+				bundle.ApprovalEvidence[i] = signedApproval(t, ae.SigType, bound)
+			}
+		}
+		planHash = bound
 	}
 	if err := bundle.Finalize(); err != nil {
 		t.Fatalf("bundle.Finalize: %v", err)

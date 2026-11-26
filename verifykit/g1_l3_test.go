@@ -81,7 +81,13 @@ func TestApprovalPreimageDecoderReadsTheNodesSharedVector(t *testing.T) {
 	}
 }
 
-func planHashVK() [32]byte { return sha256.Sum256([]byte("vk-plan")) }
+// planContentVK is the fixture plan's content hash, and planHashVK the plan hash its approvals sign: the content bound to the default
+// evaluation the fixture's plan was governed under (brief 28bu row 2).
+func planContentVK() [32]byte { return sha256.Sum256([]byte("vk-plan")) }
+
+func planHashVK() [32]byte {
+	return evidence.BindPlanHash(planContentVK(), []evidence.PolicyEvaluation{transferEvaluationFixed(transferPolicy(), 50)})
+}
 
 func verifyWithApprovals(t *testing.T, anchored bool, approvals ...evidence.ApprovalEvidenceRef) *Report {
 	t.Helper()

@@ -1,6 +1,7 @@
 package verifykit
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
 	"math/rand"
@@ -41,6 +42,16 @@ func policyRef(t *testing.T, d *policyeval.PolicyDocument) evidence.PolicyRef {
 func transferEvaluation(t *testing.T, d *policyeval.PolicyDocument, amount float64) evidence.PolicyEvaluation {
 	t.Helper()
 	return evidence.PolicyEvaluation{PolicyType: d.Type, ScopeKey: "global", Policy: policyRef(t, d),
+		Subject: evidence.PolicySubject{Actor: "acc://alice.acme", Function: "transfer", BlockHeight: 1, Amount: &amount}}
+}
+
+// transferEvaluationFixed is transferEvaluation for a fixed fixture policy (one that always encodes): planHashVK binds it without a *testing.T.
+func transferEvaluationFixed(d *policyeval.PolicyDocument, amount float64) evidence.PolicyEvaluation {
+	content, err := policyeval.EncodeDocument(d)
+	if err != nil {
+		panic(fmt.Sprintf("encode the fixture policy: %v", err))
+	}
+	return evidence.PolicyEvaluation{PolicyType: d.Type, ScopeKey: "global", Policy: evidence.PolicyRef{Hash: policyeval.ContentHash(content), Content: content},
 		Subject: evidence.PolicySubject{Actor: "acc://alice.acme", Function: "transfer", BlockHeight: 1, Amount: &amount}}
 }
 

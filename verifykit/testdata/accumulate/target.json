@@ -1,6 +1,6 @@
 {
-  "batchRoot": "e5822dbd877190afc81cabc7bcd54c4668740259775eb2558fbd78a260abc4c6",
-  "planHash": "2e0728c7439af90e22ffbd95d7a40fd60156375b6ef6b6477f25fe430efd6b57",
+  "batchRoot": "9d96c49a314ddf4ab160f5f3928dda4d3cf3655c1c35bdd8159086a4185e40f1",
+  "planHash": "ba4afb4ae8062561cdc25c03888757f60013fa74282f4e1f42f1fb72d4e6de2b",
   "bundleId": "bundle-vk",
   "page": "acc://infrix-vk.acme/book/1",
   "account": "acc://infrix-vk.acme/governance",

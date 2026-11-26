@@ -62,3 +62,14 @@ func TestFZ01_DecodersAcceptOnlyMinimalVarints(t *testing.T) {
 		t.Fatal("a padded account type was accepted")
 	}
 }
+
+func FuzzDecodeKeyPage(f *testing.F) {
+	f.Add([]byte{0x01, 0x09, 0x02, 0x01, 'x', 0x04, 0x01, 0x09, 0x01, 0x80, 0x09, 0x03, 0x02, 0x01, 0x07})
+	f.Add([]byte{0x01, 0x09, 0x02, 0x01, 'x', 0x09, 0x00})
+	f.Fuzz(func(t *testing.T, b []byte) {
+		kp, err := DecodeKeyPage(b)
+		if err == nil && (kp.URL == "" || len(kp.Keys) > len(b)) {
+			t.Fatalf("accepted %x as %+v", b, kp)
+		}
+	})
+}

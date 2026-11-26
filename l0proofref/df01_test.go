@@ -342,3 +342,63 @@ func combine(a, b []byte) []byte {
 	h.Write(b)
 	return h.Sum(nil)
 }
+
+// DF-01 for key pages (the phase-5 building block): DecodeKeyPage reads exactly what Accumulate wrote, over 1,000 random pages, and refuses a page
+// with a field Accumulate never writes.
+func TestDF01_KeyPageDecodingAgreesWithAccumulate(t *testing.T) {
+	r := rand.New(rand.NewSource(99))
+	for i := 0; i < 1000; i++ {
+		kp := &protocol.KeyPage{Url: url.MustParse(fmt.Sprintf("acc://kp-%d.acme/book/%d", i, 1+r.Intn(5))),
+			CreditBalance: uint64(r.Intn(3)) * uint64(r.Int63n(1e9)), AcceptThreshold: uint64(r.Intn(4)), RejectThreshold: uint64(r.Intn(3)),
+			ResponseThreshold: uint64(r.Intn(3)), BlockThreshold: uint64(r.Intn(3)), Version: uint64(r.Intn(50))}
+		for k := r.Intn(6); k > 0; k-- {
+			ks := &protocol.KeySpec{LastUsedOn: uint64(r.Intn(2)) * uint64(r.Int63n(1e12))}
+			if r.Intn(5) != 0 {
+				ks.PublicKeyHash = rnd32(r)
+			}
+			if r.Intn(4) == 0 {
+				ks.Delegate = url.MustParse(fmt.Sprintf("acc://delegate-%d.acme/book", r.Intn(1e6)))
+			}
+			kp.Keys = append(kp.Keys, ks)
+		}
+		if r.Intn(4) == 0 {
+			bl := protocol.AllowedTransactions(r.Intn(1 << 10))
+			kp.TransactionBlacklist = &bl
+		}
+		main, err := kp.MarshalBinary()
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := l0proof.DecodeKeyPage(main)
+		if err != nil {
+			t.Fatalf("page %d: %v", i, err)
+		}
+		if got.URL != kp.Url.String() || got.CreditBalance != kp.CreditBalance || got.AcceptThreshold != kp.AcceptThreshold || got.RejectThreshold != kp.RejectThreshold ||
+			got.ResponseThreshold != kp.ResponseThreshold || got.BlockThreshold != kp.BlockThreshold || got.Version != kp.Version || len(got.Keys) != len(kp.Keys) {
+			t.Fatalf("page %d: decoded %+v, Accumulate wrote %+v", i, got, kp)
+		}
+		for k, ks := range kp.Keys {
+			g := got.Keys[k]
+			d := ""
+			if ks.Delegate != nil {
+				d = ks.Delegate.String()
+			}
+			if !bytes.Equal(g.PublicKeyHash, ks.PublicKeyHash) || g.LastUsedOn != ks.LastUsedOn || g.Delegate != d {
+				t.Fatalf("page %d key %d: decoded %+v, Accumulate wrote %+v", i, k, g, ks)
+			}
+		}
+		if (got.TransactionBlacklist == nil) != (kp.TransactionBlacklist == nil) || (got.TransactionBlacklist != nil && *got.TransactionBlacklist != uint64(*kp.TransactionBlacklist)) {
+			t.Fatalf("page %d: blacklist differs", i)
+		}
+		// bite: a trailing unknown field is refused
+		if _, err := l0proof.DecodeKeyPage(append(append([]byte(nil), main...), 0x0b, 0x01)); err == nil {
+			t.Fatalf("page %d with an unknown field was accepted", i)
+		}
+	}
+	if _, err := l0proof.DecodeKeyPage(func() []byte {
+		b, _ := (&protocol.DataAccount{Url: url.MustParse("acc://x.acme/d")}).MarshalBinary()
+		return b
+	}()); err == nil {
+		t.Fatal("a data account decoded as a key page")
+	}
+}

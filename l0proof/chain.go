@@ -34,6 +34,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/opendlt/infrix-verify/l0proof/consensus"
 	"github.com/opendlt/infrix-verify/l0proof/internal/hexb"
@@ -96,6 +97,9 @@ type Options struct {
 	Network     string         // the network whose compiled pin to use, e.g. "kermit"
 	OverridePin *consensus.Pin // an explicit relying-party pin; never taken from a proof
 	Limits      *Limits        // nil means DefaultLimits
+	// Clock is the relying party's own clock; when set, CometBFT's trusting-period and clock-drift checks are enforced (RelyingPartyClock).
+	// Nil means no clock: the checks are not made and the Result records ClockApplied false.
+	Clock *RelyingPartyClock
 }
 
 // Result is the verdict. Verified is true only when every link was checked; otherwise Reason names the first link that failed, and nothing is credited.
@@ -108,12 +112,20 @@ type Result struct {
 	TxHash          Bytes  // the recomputed transaction hash
 	DirectoryRoot   Bytes  // the Directory BPT root the chain reached
 	DirectoryHeight int64  // the height of the certified Directory header
+
+	// ClockApplied records whether the relying party's clock was applied (the trusting-period and drift checks enforced); false means the
+	// verdict is clock-unchecked. TrustingPeriod and MaxClockDrift are the bounds applied, and ClockNow the time, when it was.
+	ClockApplied   bool
+	TrustingPeriod time.Duration
+	MaxClockDrift  time.Duration
+	ClockNow       time.Time
 }
 
 func fail(r Result, format string, args ...any) Result {
 	r.Verified = false
 	r.Reason = fmt.Sprintf(format, args...)
 	r.TxHash, r.DirectoryRoot, r.DirectoryHeight = nil, nil, 0
+	r.ClockApplied, r.TrustingPeriod, r.MaxClockDrift, r.ClockNow = false, 0, 0, time.Time{}
 	return r
 }
 
@@ -192,6 +204,13 @@ func Verify(c *L0ProofChain, exp Expectation, opts Options) Result {
 	}
 	if !bytes.Equal(last.Header.AppHash, root) {
 		return fail(res, "the Directory root %X is not the AppHash %X of the certified header at height %d", root, []byte(last.Header.AppHash), last.Header.Height)
+	}
+	if opts.Clock != nil {
+		tp, drift, err := checkClock(opts.Clock, c.Consensus, last)
+		if err != nil {
+			return fail(res, "relying-party clock: %v", err)
+		}
+		res.ClockApplied, res.TrustingPeriod, res.MaxClockDrift, res.ClockNow = true, tp, drift, opts.Clock.Now.UTC()
 	}
 	res.Verified = true
 	res.TxHash, res.DirectoryRoot, res.DirectoryHeight = txHash, root, last.Header.Height

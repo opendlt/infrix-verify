@@ -44,8 +44,10 @@ func computeProofLevel(storage, account, anchored, l0Confirmed bool) assurance.P
 // computeGovernanceLevel classifies how strongly the operation was
 // governed:
 //
-//   - G0 (policy passed): the bundle records at least one policy decision
-//     and none of them denied.
+//   - G0 (policy passed): `policyAllowed`: this verifier re-ran every content-addressed policy
+//     the bundle says its plan was decided under, with the node's own evaluator body, and
+//     every one allows (checkPolicyReevaluation, brief 28bi). A recorded decision is never
+//     credited; a recorded denial still makes the bundle ungoverned.
 //   - G1 (threshold approved): G0 plus `approvalsSigned`: the bundle records
 //     at least one approval and EVERY approval's signature was verified by
 //     this verifier over the package's plan hash under its declared scheme
@@ -59,19 +61,16 @@ func computeProofLevel(storage, account, anchored, l0Confirmed bool) assurance.P
 //     P1-4). It is NEVER credited from the self-asserted
 //     evidence.ExternalProofRef.Verified flag (DX P0-5b).
 //   - ungoverned: anything less.
-func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed, approvalsSigned, externalProofConfirmed, anchored bool) assurance.GovernanceLevel {
+func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed, policyAllowed, approvalsSigned, externalProofConfirmed, anchored bool) assurance.GovernanceLevel {
 	if !parsed {
 		return assurance.GovernanceLevelUngoverned
 	}
-
-	policyAllowed := false
 	for _, d := range bundle.PolicyDecisions {
 		if isDeny(d.Decision) {
 			// A recorded denial means the operation was not cleanly
 			// governed-and-allowed; do not credit G0.
 			return assurance.GovernanceLevelUngoverned
 		}
-		policyAllowed = true
 	}
 	if !policyAllowed {
 		return assurance.GovernanceLevelUngoverned

@@ -76,7 +76,18 @@ func unheldPin(incarnation string, opts Options) (string, bool) {
 	if err != nil || incarnation == pin.ID() {
 		return "", false
 	}
-	return fmt.Sprintf("captured under pin %q, which this verifier does not hold (its trust root is the compiled %s pin %q): %s", incarnation, o.Network, pin.ID(), PinFlagHint), true
+	return fmt.Sprintf("captured under pin %s, which this verifier does not hold (its trust root is the compiled %s pin %s): %s", shortPinID(incarnation), o.Network, shortPinID(pin.ID()), PinFlagHint), true
+}
+
+// shortPinID is a pin ID's identifying prefix for a report's prose ("pin:" and the first 16 hex characters, then an ellipsis): enough to tell
+// incarnations apart by eye, while every comparison the verifier makes uses the full ID. Prose carries no unlabelled 64-hex run, which an
+// output scan for key material would flag (found by agent 28bl in the agent surface's proof.verify output).
+func shortPinID(id string) string {
+	const keep = len("pin:") + 16
+	if len(id) <= keep {
+		return id
+	}
+	return id[:keep] + "..."
 }
 
 // txPrincipal reads a transaction header's principal (field 1, a URL): the anchor account the WriteData names. The account adds no trust: what L4 proves

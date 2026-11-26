@@ -132,7 +132,10 @@ func (r *Report) checkEmbeddedL0Proof(bundle *evidence.EvidenceBundle, parsed, a
 	if res.PinOverridden {
 		pinNote = "relying-party pin"
 	}
-	r.add(name, CheckPass, fmt.Sprintf("batch root %x anchored by tx %x, certified at Directory height %d (%s network %s, %s %s)", root, []byte(res.TxHash), res.DirectoryHeight, pinNote, res.Network, "pin", res.Pin))
+	// the full identifiers go under their labelled keys; the prose names each by its prefix (brief 28bs row 1)
+	r.addPublic(name, CheckPass, fmt.Sprintf("batch root %s anchored by tx %s, certified at Directory height %d (%s network %s, pin %s)", shortHex(root[:]),
+		shortHex(res.TxHash), res.DirectoryHeight, pinNote, res.Network, shortPinID(res.Pin)),
+		&PublicRefs{TxHash: fmt.Sprintf("%x", []byte(res.TxHash)), BatchRoot: fmt.Sprintf("%x", root[:]), DirectoryRoot: fmt.Sprintf("%x", []byte(res.DirectoryRoot)), PinID: res.Pin})
 	return true
 }
 
@@ -254,7 +257,8 @@ func (r *Report) checkGovernanceExecution(bundle *evidence.EvidenceBundle, planH
 		r.add(name, CheckFail, res.Reason)
 		return false
 	}
-	r.add(name, CheckPass, fmt.Sprintf("Accumulate executed the %d-of-%d approval (tx %x) at block %d under %s (pin %s)", res.Signers, res.Threshold, res.TxHash, res.Height, opts.GovernancePage, res.Pin))
+	r.addPublic(name, CheckPass, fmt.Sprintf("Accumulate executed the %d-of-%d approval (tx %s) at block %d under %s (pin %s)", res.Signers, res.Threshold,
+		shortHex(res.TxHash), res.Height, opts.GovernancePage, shortPinID(res.Pin)), &PublicRefs{TxHash: fmt.Sprintf("%x", res.TxHash), PinID: res.Pin})
 	return true
 }
 

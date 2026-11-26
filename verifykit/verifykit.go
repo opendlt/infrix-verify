@@ -62,6 +62,31 @@ type Check struct {
 	Name   string      `json:"name"`
 	Status CheckStatus `json:"status"`
 	Detail string      `json:"detail,omitempty"`
+	// Public carries the public identifiers a check verified, each in full under its labelled key and in its exact format; the Detail prose
+	// names them by an identifying prefix only (brief 28bs row 1, main's ruling on the agent key scan: a relying party compares the full
+	// values from these keys, and a rendered report carries no unlabelled 32-byte hex run). Nil when the check names none.
+	Public *PublicRefs `json:"public,omitempty"`
+}
+
+// PublicRefs are the public identifiers an embedded-proof check verified. Each is the full value in one exact format:
+//   - TxHash: the Accumulate transaction hash, 64 lowercase hex characters;
+//   - BatchRoot: the anchor batch root the transaction wrote, 64 lowercase hex characters;
+//   - DirectoryRoot: the certified Directory BPT root the proof chain reached, 64 lowercase hex characters;
+//   - PinID: the pin the verdict is relative to, "pin:" then 64 lowercase hex characters.
+type PublicRefs struct {
+	TxHash        string `json:"txHash,omitempty"`
+	BatchRoot     string `json:"batchRoot,omitempty"`
+	DirectoryRoot string `json:"directoryRoot,omitempty"`
+	PinID         string `json:"pinId,omitempty"`
+}
+
+// shortHex names a public value in report prose by its identifying prefix (16 hex characters); the full value is in the check's Public.
+func shortHex(b []byte) string {
+	const keep = 8
+	if len(b) <= keep {
+		return fmt.Sprintf("%x", b)
+	}
+	return fmt.Sprintf("%x...", b[:keep])
 }
 
 // ReplayResult is the optional deterministic-replay outcome. Replay is
@@ -492,6 +517,11 @@ func (r *Report) integrityHolds() bool {
 // add appends a check.
 func (r *Report) add(name string, status CheckStatus, detail string) {
 	r.Checks = append(r.Checks, Check{Name: name, Status: status, Detail: detail})
+}
+
+// addPublic records a check together with the public identifiers it verified (brief 28bs row 1).
+func (r *Report) addPublic(name string, status CheckStatus, detail string, public *PublicRefs) {
+	r.Checks = append(r.Checks, Check{Name: name, Status: status, Detail: detail, Public: public})
 }
 
 // hasFailures reports whether any check failed.

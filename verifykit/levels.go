@@ -19,11 +19,16 @@ import (
 //
 //   - L4 (L0 settlement): the bundle is anchored AND the anchor tx was
 //     independently confirmed on live L0.
-//   - L3 (batch inclusion): the bundle is anchored (a valid anchor proof
-//     binds it to a batch) but L0 was not consulted (no endpoint).
+//   - L3 (batch inclusion): the bundle is anchored: the bundle hash this
+//     verifier recomputes is proven by Merkle inclusion into the batch root
+//     the anchor record names (checkAnchorProof). The node-set anchorStatus
+//     field is never read for it (brief 28bd row 2, L2992).
 //   - L0 (none): the bundle is not anchored.
 //
-// This is deliberately conservative: without a live L0 endpoint the kit
+// The source of an L4 is recorded beside the level. Today's only L4 route is
+// a live L0 query; the documented rule is that offline verification can claim
+// L4 only from an embedded, pinned, fully verified proof chain, and never from
+// node output (operator decision 2026-11-26, L2992). Without either the kit
 // will not claim L4 even for an anchored bundle.
 func computeProofLevel(anchored, l0Confirmed bool) assurance.ProofLevel {
 	switch {
@@ -37,19 +42,24 @@ func computeProofLevel(anchored, l0Confirmed bool) assurance.ProofLevel {
 }
 
 // computeGovernanceLevel classifies how strongly the operation was
-// governed, read entirely from the verified bundle:
+// governed:
 //
 //   - G0 (policy passed): the bundle records at least one policy decision
 //     and none of them denied.
-//   - G1 (threshold approved): G0 plus signed approval evidence bound to
-//     the plan hash.
+//   - G1 (threshold approved): G0 plus `approvalsSigned`: the bundle records
+//     at least one approval and EVERY approval's signature was verified by
+//     this verifier over the package's plan hash under its declared scheme
+//     (checkApprovalSignatures, brief 28bd row 1). An identity string the node
+//     listed is not an approval; an unsigned, forged or uncheckable approval
+//     caps the bundle at G0.
 //   - G2 (credentialed + anchored): G1 plus an INDEPENDENTLY confirmed
-//     external/credential proof and an anchored bundle. G2 is credited only when
-//     `externalProofConfirmed` is true — i.e. an injected ExternalProofConfirmer
-//     re-read the proof from its source (DX P1-4). It is NEVER credited from the
-//     self-asserted evidence.ExternalProofRef.Verified flag (DX P0-5b).
+//     external/credential proof and an anchored bundle (anchored by proof, as
+//     for L3). G2 is credited only when `externalProofConfirmed` is true, i.e.
+//     an injected ExternalProofConfirmer re-read the proof from its source (DX
+//     P1-4). It is NEVER credited from the self-asserted
+//     evidence.ExternalProofRef.Verified flag (DX P0-5b).
 //   - ungoverned: anything less.
-func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool, externalProofConfirmed bool) assurance.GovernanceLevel {
+func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed, approvalsSigned, externalProofConfirmed, anchored bool) assurance.GovernanceLevel {
 	if !parsed {
 		return assurance.GovernanceLevelUngoverned
 	}
@@ -67,26 +77,13 @@ func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool, extern
 		return assurance.GovernanceLevelUngoverned
 	}
 
-	hasSignedApproval := false
-	for _, ae := range bundle.ApprovalEvidence {
-		if ae.PlanHash != ([32]byte{}) && ae.Identity != "" {
-			hasSignedApproval = true
-			break
-		}
-	}
-	if !hasSignedApproval {
+	if !approvalsSigned {
 		return assurance.GovernanceLevelPolicyPassed
 	}
 
-	// G2 (credentialed + anchored) requires an INDEPENDENTLY confirmed external/
-	// credential proof AND an anchored bundle. `externalProofConfirmed` is set by
-	// the caller only when an injected ExternalProofConfirmer re-read the proof
-	// from its source chain (checkExternalProof) — never from the self-asserted
-	// evidence.ExternalProofRef.Verified flag, which would trust the producing
-	// node (the exact property this "no node trust" kit refutes, DX P0-5b/P1-4).
-	// With no confirmer, externalProofConfirmed is false and governance caps at
-	// G1 — the honest default.
-	anchored := bundle.Anchor == evidence.AnchorStatusAnchored || bundle.Anchor == evidence.AnchorStatusVerified
+	// G2 requires an INDEPENDENTLY confirmed external/credential proof AND an
+	// anchored-by-proof bundle. With no confirmer, externalProofConfirmed is
+	// false and governance caps at G1, the honest default.
 	if externalProofConfirmed && anchored {
 		return assurance.GovernanceLevelCredentialedAnchored
 	}

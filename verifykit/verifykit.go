@@ -29,6 +29,12 @@ import (
 	"github.com/opendlt/infrix-verify/witness"
 )
 
+// The sources an L4 proof level can come from (Report.ProofLevelSource).
+const (
+	ProofSourceLiveQuery     = "live-query"
+	ProofSourceEmbeddedProof = "embedded-proof"
+)
+
 // CheckStatus is the per-check outcome.
 type CheckStatus string
 
@@ -74,6 +80,11 @@ type Report struct {
 	AssuranceClass      string  `json:"assuranceClass"`
 	AssuranceMultiplier float64 `json:"assuranceMultiplier"`
 	Tier                string  `json:"tier"`
+	// ProofLevelSource records where an L4 came from: ProofSourceLiveQuery (the anchor tx re-read from an L0 endpoint) or
+	// ProofSourceEmbeddedProof (an embedded proof chain verified against the verifier's own pinned network incarnation). Empty below
+	// L4. Operator decision 2026-11-26 (L2992): offline verification may claim L4 only from an embedded, pinned, fully verified proof
+	// chain, never from node output.
+	ProofLevelSource string `json:"proofLevelSource,omitempty"`
 
 	// platform-review-3 Epic 2: the layered verification truth, identical
 	// to the fields the Nexus proof inspector surfaces. CryptographicallyVerified
@@ -286,8 +297,12 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	report.checkEvidenceChain(pkg)
 	report.checkPluginInventory(pkg)
 
-	anchored := bundleParsed && (bundle.Anchor == evidence.AnchorStatusAnchored || bundle.Anchor == evidence.AnchorStatusVerified)
-	report.checkAnchorProof(pkg, &bundle, anchored)
+	// G1 is credited from approvals whose signatures this verifier checks itself (brief 28bd row 1), never from an identity string.
+	approvalsSigned := report.checkApprovalSignatures(pkg, &bundle, bundleParsed)
+
+	// "Anchored" is the Merkle inclusion of the bundle hash THIS verifier recomputes into the batch root the anchor record names
+	// (brief 28bd row 2). The node-set anchorStatus field is never read for it.
+	anchored := report.checkAnchorProof(pkg, &bundle, bundleParsed)
 
 	// 9-11. Live L0 confirmation — fetch the anchor tx directly from L0.
 	l0Confirmed := report.checkL0Anchor(ctx, &bundle, anchored, opts.L0Confirmer)
@@ -324,8 +339,11 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 
 	// 12-14. Classify achieved assurance + finalize the verdict.
 	proof := computeProofLevel(anchored, l0Confirmed)
-	gov := computeGovernanceLevel(&bundle, bundleParsed, externalProofConfirmed)
+	gov := computeGovernanceLevel(&bundle, bundleParsed, approvalsSigned, externalProofConfirmed, anchored)
 	report.finalizeLevels(proof, gov, opts.Require)
+	if proof == assurance.ProofLevelL0Settlement {
+		report.ProofLevelSource = ProofSourceLiveQuery
+	}
 
 	// Derived layered-verification flags (mirror the Nexus inspector).
 	report.L0Verified = l0Confirmed
@@ -475,24 +493,79 @@ func (r *Report) checkPluginInventory(pkg *evidence.PortableEvidencePackage) {
 	r.add("plugin_inventory", CheckPass, fmt.Sprintf("%d plugin version(s)", len(pkg.PluginVersions)))
 }
 
-func (r *Report) checkAnchorProof(pkg *evidence.PortableEvidencePackage, bundle *evidence.EvidenceBundle, anchored bool) {
-	if !anchored {
-		r.add("anchor_proof", CheckSkip, "bundle is not anchored")
-		return
+// checkAnchorProof decides whether the bundle is anchored, from evidence this verifier checks itself: the anchor record names this
+// bundle and the bundle hash recomputed from the bundle's content, and the bundle's AnchorInclusion proves that hash is a leaf of
+// the batch root it names (a one-leaf batch for a bundle anchored alone). It returns true only then.
+//
+// The node-set anchorStatus is never read for the verdict: a bundle that says "anchored" with no inclusion proof is not anchored
+// here (a SKIP that leaves the proof level at L0); an inclusion or anchor record that is present and wrong is a FAIL, a tamper.
+func (r *Report) checkAnchorProof(pkg *evidence.PortableEvidencePackage, bundle *evidence.EvidenceBundle, parsed bool) bool {
+	if !parsed {
+		r.add("anchor_proof", CheckSkip, "bundle did not parse")
+		return false
+	}
+	if pkg.AnchorProof == nil && bundle.AnchorInclusion == nil {
+		detail := "bundle carries no anchor proof"
+		if bundle.Anchor == evidence.AnchorStatusAnchored || bundle.Anchor == evidence.AnchorStatusVerified {
+			detail = fmt.Sprintf("the bundle's anchorStatus says %q but it carries no anchor proof; a node-set status is not evidence (not anchored)", bundle.Anchor)
+		}
+		r.add("anchor_proof", CheckSkip, detail)
+		return false
 	}
 	if pkg.AnchorProof == nil {
-		r.add("anchor_proof", CheckFail, "anchored bundle missing AnchorProof")
-		return
+		r.add("anchor_proof", CheckFail, "the bundle carries an anchor inclusion but the package has no AnchorProof record")
+		return false
+	}
+	if bundle.AnchorInclusion == nil {
+		r.add("anchor_proof", CheckSkip, "the package carries an AnchorProof record but the bundle has no inclusion proof of its hash in the anchored batch (not anchored)")
+		return false
 	}
 	if pkg.AnchorProof.BundleID != bundle.ID {
 		r.add("anchor_proof", CheckFail, "AnchorProof.BundleID does not match bundle")
-		return
+		return false
 	}
 	if bundle.AnchorTxHash != "" && pkg.AnchorTxHash != bundle.AnchorTxHash {
 		r.add("anchor_proof", CheckFail, "AnchorTxHash cross-binding mismatch")
-		return
+		return false
 	}
-	r.add("anchor_proof", CheckPass, "anchor proof bound to the bundle")
+	leaf, err := bundle.ComputeBundleHash()
+	if err != nil {
+		r.add("anchor_proof", CheckFail, "recompute bundle hash: "+err.Error())
+		return false
+	}
+	if pkg.AnchorProof.BundleHash != leaf {
+		r.add("anchor_proof", CheckFail, "the anchor record's BundleHash is not the hash of this bundle's content")
+		return false
+	}
+	if err := evidence.VerifyAnchorInclusion(leaf, bundle.AnchorInclusion); err != nil {
+		r.add("anchor_proof", CheckFail, err.Error())
+		return false
+	}
+	r.add("anchor_proof", CheckPass, fmt.Sprintf("bundle hash proven at leaf %d of the %d-leaf batch root %x",
+		bundle.AnchorInclusion.LeafIndex, bundle.AnchorInclusion.LeafCount, bundle.AnchorInclusion.BatchRoot))
+	return true
+}
+
+// checkApprovalSignatures adds the approval_signatures check and returns whether every approval in the bundle carries a signature
+// this verifier checked over the package's plan hash. A wrong signature or binding is a FAIL (a forged or tampered approval); an
+// unsigned approval, or one in a scheme this verifier does not implement, is a SKIP that caps governance at G0.
+func (r *Report) checkApprovalSignatures(pkg *evidence.PortableEvidencePackage, bundle *evidence.EvidenceBundle, parsed bool) bool {
+	if !parsed {
+		r.add("approval_signatures", CheckSkip, "bundle did not parse")
+		return false
+	}
+	v := checkApprovalSignatures(bundle, pkg.PlanHash)
+	switch {
+	case v.Count == 0:
+		r.add("approval_signatures", CheckSkip, "bundle records no approval (governance caps at G0)")
+	case len(v.Failures) > 0:
+		r.add("approval_signatures", CheckFail, strings.Join(v.Failures, "; "))
+	case len(v.Uncheckable) > 0:
+		r.add("approval_signatures", CheckSkip, "not credited (governance caps at G0): "+strings.Join(v.Uncheckable, "; "))
+	default:
+		r.add("approval_signatures", CheckPass, fmt.Sprintf("%d approval signature(s) verified over the plan hash", v.Count))
+	}
+	return v.Signed
 }
 
 // checkL0Anchor performs the live L0 confirmation and returns whether the

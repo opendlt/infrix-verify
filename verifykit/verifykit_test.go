@@ -51,6 +51,15 @@ func buildPortable(t *testing.T, anchored bool) *evidence.PortableEvidencePackag
 // buildPortableFor builds the same bundle with the state root and the outcome id the caller names (the outcome id is the consumer a state root proof is bound to).
 func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID string) *evidence.PortableEvidencePackage {
 	t.Helper()
+	return buildPortableWith(t, anchored, stateRoot, outcomeID, nil, nil)
+}
+
+// buildPortableWith builds the same bundle, letting pre change the bundle before it is sealed (Finalize) and post change the sealed
+// bundle and the package inputs before the package is built and its ExportHash computed: a tamper the node could make and still
+// produce a package whose offline integrity gate passes.
+func buildPortableWith(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID string,
+	pre func(*evidence.EvidenceBundle), post func(*evidence.EvidenceBundle, *evidence.BuildPortablePackageInputs)) *evidence.PortableEvidencePackage {
+	t.Helper()
 	planHash := sha256.Sum256([]byte("vk-plan"))
 	outcomeDigest := sha256.Sum256([]byte("vk-outcome-canonical"))
 
@@ -70,7 +79,7 @@ func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID
 		StateRoot:         stateRoot,
 		OutcomeID:         outcomeID,
 		PolicyDecisions:   []evidence.DecisionProofRef{{PolicyType: "transfer", RuleID: "allow", Decision: "allow", BlockHeight: 1}},
-		ApprovalEvidence:  []evidence.ApprovalEvidenceRef{{StageID: "s1", Identity: "acc://approver.acme", Role: "approver", PlanHash: planHash}},
+		ApprovalEvidence:  []evidence.ApprovalEvidenceRef{signedApproval(t, evidence.ApprovalSigTypeInfrixEd25519, planHash)},
 		ExternalProofs:    []evidence.ExternalProofRef{{SourceChain: "acc", ProofType: "groth16", Verified: true}},
 		OutcomeDigest:     outcomeDigest,
 		SealedBlockHeight: 100,
@@ -81,8 +90,20 @@ func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID
 		bundle.AnchorBlock = 4242
 		bundle.AnchorRecordID = "anchor-rec-vk"
 	}
+	if pre != nil {
+		pre(bundle)
+	}
 	if err := bundle.Finalize(); err != nil {
 		t.Fatalf("bundle.Finalize: %v", err)
+	}
+	if anchored {
+		// the bundle is leaf 1 of a 3-leaf batch, as the batch-at-block anchorer writes it
+		batch := [][32]byte{sha256.Sum256([]byte("other bundle 0")), bundle.BundleHash, sha256.Sum256([]byte("other bundle 2"))}
+		incl, err := evidence.GenerateAnchorInclusion(batch, 1)
+		if err != nil {
+			t.Fatalf("GenerateAnchorInclusion: %v", err)
+		}
+		bundle.AnchorInclusion = incl
 	}
 
 	bundleData, err := evidence.CanonicalJSON(bundle)
@@ -118,6 +139,13 @@ func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID
 		in.AnchorBlock = bundle.AnchorBlock
 	}
 
+	if post != nil {
+		post(bundle, &in)
+		in.BundleData, err = evidence.CanonicalJSON(bundle)
+		if err != nil {
+			t.Fatalf("canonicalize bundle: %v", err)
+		}
+	}
 	pkg, err := evidence.BuildPortablePackageWithBindings(in)
 	if err != nil {
 		t.Fatalf("BuildPortablePackageWithBindings: %v", err)

@@ -579,8 +579,10 @@ func (r *Report) checkAnchorProof(pkg *evidence.PortableEvidencePackage, bundle 
 		r.add("anchor_proof", CheckFail, err.Error())
 		return false
 	}
-	r.add("anchor_proof", CheckPass, fmt.Sprintf("bundle hash proven at leaf %d of the %d-leaf batch root %x",
-		bundle.AnchorInclusion.LeafIndex, bundle.AnchorInclusion.LeafCount, bundle.AnchorInclusion.BatchRoot))
+	// The root is named by its first 12 bytes: the full value is in the bundle, and a rendered report carries no 32-byte hex run a
+	// secret scanner cannot tell from key material (infrix-core's agent self-test, brief 28bj).
+	r.add("anchor_proof", CheckPass, fmt.Sprintf("bundle hash proven at leaf %d of the %d-leaf batch root %x…",
+		bundle.AnchorInclusion.LeafIndex, bundle.AnchorInclusion.LeafCount, bundle.AnchorInclusion.BatchRoot[:12]))
 	return true
 }
 

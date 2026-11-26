@@ -750,6 +750,8 @@ github.com/opendlt/infrix-schema v0.7.2-0.20261126161059-81bf97e50dc4 h1:sZ07fcL
 github.com/opendlt/infrix-schema v0.7.2-0.20261126161059-81bf97e50dc4/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=
 github.com/opendlt/infrix-schema v0.7.2-0.20261126163250-9b00eb007eb4 h1:oCpIKPMn+PRr24uZffk0xFIFrNbFGacdwKZbf0y/5+8=
 github.com/opendlt/infrix-schema v0.7.2-0.20261126163250-9b00eb007eb4/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=
+github.com/opendlt/infrix-schema v0.7.2-0.20261126170858-2d55564fa4c8 h1:qSeGFfQaYPe6szTrR7dM0baWBSXx6PwJ+vc3yAG4+vQ=
+github.com/opendlt/infrix-schema v0.7.2-0.20261126170858-2d55564fa4c8/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=
 github.com/opentracing/opentracing-go v1.2.0 h1:uEJPy/1a5RIPAJ0Ov+OIO8OxWu77jEv+1B0VhjKrZUs=
 github.com/opentracing/opentracing-go v1.2.0/go.mod h1:GxEUsuufX4nBwe+T+Wl9TAgYrxe9dPLANfrWvHYVTgc=
 github.com/openzipkin/zipkin-go v0.1.1/go.mod h1:NtoC/o8u3JlF1lSlyPNswIbeQH9bJTmOf0Erfk+hxe8=

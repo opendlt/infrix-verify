@@ -31,7 +31,8 @@ type levelWitness struct {
 	policyAllowed              bool   // every content-addressed policy re-evaluated to allow
 	approvalsProven            bool   // every approval signature verified AND its key proven on its page by an embedded key-page proof
 	governanceExecuted         bool   // the approval was executed by Accumulate, proven by the embedded chain
-	externalProofs             bool   // the bundle references an external proof, so G2 also rests on its live confirmation
+	externalProofs             bool   // the bundle references an external proof, so G2 also rests on its confirmation
+	externalEmbedded           bool   // every external proof was confirmed by an embedded chain against the verifier's pin (brief 28bk row 3)
 }
 
 // levelSources maps every credited level ("L1".."L4", "G0".."G2") to its source, from the final levels and what the verifier witnessed.
@@ -58,7 +59,7 @@ func levelSources(proof assurance.ProofLevel, gov assurance.GovernanceLevel, w l
 	}
 	if w.governanceExecuted && gov >= assurance.GovernanceLevelCredentialedAnchored {
 		src := LevelSourceEmbeddedProof
-		if w.externalProofs {
+		if w.externalProofs && !w.externalEmbedded {
 			src = LevelSourceLiveQuery
 		}
 		out[assurance.GovernanceLevelCredentialedAnchored.String()] = src

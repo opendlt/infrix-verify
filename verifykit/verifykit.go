@@ -25,6 +25,7 @@ import (
 
 	"github.com/opendlt/infrix-schema/assurance"
 	"github.com/opendlt/infrix-schema/evidence"
+	"github.com/opendlt/infrix-verify/l0proof"
 	"github.com/opendlt/infrix-verify/l0proof/consensus"
 	"github.com/opendlt/infrix-verify/stateroot"
 	"github.com/opendlt/infrix-verify/witness"
@@ -350,7 +351,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 
 	// 9-11. Live L0 confirmation — fetch the anchor tx directly from L0.
 	l0Confirmed := report.checkL0Anchor(ctx, &bundle, anchored, opts.L0Confirmer)
-	externalProofConfirmed := report.checkExternalProof(ctx, &bundle, opts.ExternalProofConfirmer)
+	externalProofConfirmed, externalEmbedded := report.checkExternalProof(ctx, &bundle, opts)
 
 	// The embedded Accumulate proofs, each against the verifier's own pin (native proof plan phases 5 and 7): offline L4, the approver keys on their
 	// pages (G1) and the Accumulate-executed approval (G2).
@@ -413,7 +414,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	report.LevelSources = levelSources(proof, gov, levelWitness{
 		storage: stateProven.Storage, account: stateProven.Account, anchored: anchored, l4Source: report.ProofLevelSource,
 		policyAllowed: policyAllowed, approvalsProven: approvalsSigned && keyPagesProven, governanceExecuted: governanceExecuted,
-		externalProofs: len(bundle.ExternalProofs) > 0,
+		externalProofs: len(bundle.ExternalProofs) > 0, externalEmbedded: externalEmbedded,
 	})
 
 	// Derived layered-verification flags (mirror the Nexus inspector).
@@ -752,21 +753,51 @@ func (r *Report) checkL0Anchor(ctx context.Context, bundle *evidence.EvidenceBun
 // proof reference against its source chain and returns whether at least one was
 // confirmed. This is the honest basis for governance level G2 — never the
 // self-asserted evidence.ExternalProofRef.Verified flag (DX P0-5b/P1-4).
-func (r *Report) checkExternalProof(ctx context.Context, bundle *evidence.EvidenceBundle, confirmer ExternalProofConfirmer) bool {
+//
+// Two routes confirm a proof (brief 28bk row 3, main's ruling (a)). EMBEDDED: every referenced proof carries the l0proof chain of the
+// WriteData that holds its ProofHash as one whole data item on its Account, and each chain verifies against THIS verifier's pin (the
+// compiled network pin or the relying party's Options.L0Pin, never the bundle's): offline, source embedded-proof. A chain that does not
+// verify fails the check with its reason, and governance stays at G1. LIVE: otherwise an injected confirmer re-reads the proof from its
+// source (source live-query). It returns whether the proofs are confirmed and whether the embedded route confirmed them.
+func (r *Report) checkExternalProof(ctx context.Context, bundle *evidence.EvidenceBundle, opts Options) (confirmed, embedded bool) {
 	if len(bundle.ExternalProofs) == 0 {
 		r.add("external_proof", CheckSkip, "bundle references no external proof")
-		return false
+		return false, false
 	}
+	allEmbedded := true
+	for i := range bundle.ExternalProofs {
+		if len(bundle.ExternalProofs[i].L0Proof) == 0 {
+			allEmbedded = false
+		}
+	}
+	if allEmbedded {
+		for i := range bundle.ExternalProofs {
+			ep := &bundle.ExternalProofs[i]
+			chain, err := l0proof.Decode(ep.L0Proof, nil)
+			if err != nil {
+				r.add("external_proof", CheckFail, fmt.Sprintf("external proof %d: embedded chain: %v (governance caps at G1)", i, err))
+				return false, false
+			}
+			res := l0proof.Verify(chain, l0proof.Expectation{AnchorAccount: ep.Account, Leaf: ep.ProofHash[:]}, l0Opts(opts))
+			if !res.Verified {
+				r.add("external_proof", CheckFail, fmt.Sprintf("external proof %d: embedded chain does not confirm it: %s (governance caps at G1)", i, res.Reason))
+				return false, false
+			}
+		}
+		r.add("external_proof", CheckPass, fmt.Sprintf("%d external proof(s) confirmed by embedded Accumulate chains against the verifier's pin", len(bundle.ExternalProofs)))
+		return true, true
+	}
+	confirmer := opts.ExternalProofConfirmer
 	if confirmer == nil {
-		r.add("external_proof", CheckSkip, "no external-proof confirmer supplied — external proof not independently confirmed (governance caps at G1)")
-		return false
+		r.add("external_proof", CheckSkip, "no external-proof confirmer supplied and no embedded confirmation — external proof not independently confirmed (governance caps at G1)")
+		return false, false
 	}
 	for i := range bundle.ExternalProofs {
 		ep := bundle.ExternalProofs[i]
 		conf, err := confirmer.ConfirmExternalProof(ctx, ep.SourceChain, ep.ProofType, ep.TxHash, ep.ProofHash, ep.BlockHeight)
 		if err != nil {
 			r.add("external_proof", CheckFail, "external proof confirmation error: "+err.Error())
-			return false
+			return false, false
 		}
 		if conf != nil && conf.Confirmed {
 			detail := "external proof independently confirmed"
@@ -774,11 +805,11 @@ func (r *Report) checkExternalProof(ctx context.Context, bundle *evidence.Eviden
 				detail += " (" + conf.Detail + ")"
 			}
 			r.add("external_proof", CheckPass, detail)
-			return true
+			return true, false
 		}
 	}
 	r.add("external_proof", CheckFail, "no referenced external proof could be independently confirmed")
-	return false
+	return false, false
 }
 
 // finalizeLevels sets the level fields + the overall Verified flag.

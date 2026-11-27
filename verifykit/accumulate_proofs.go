@@ -266,6 +266,19 @@ func (r *Report) checkApprovalKeyPages(bundle *evidence.EvidenceBundle, approval
 func (r *Report) checkGovernanceExecution(bundle *evidence.EvidenceBundle, planHash [32]byte, parsed bool, opts Options) bool {
 	const name = "governance_execution"
 	if !parsed || len(bundle.GovernanceExecution) == 0 {
+		// an approval the node executed on Accumulate but could not capture is named, never credited: the bundle claims exactly what was captured
+		var lost []string
+		if parsed {
+			for _, u := range bundle.UncapturedProofs {
+				if u.Kind == evidence.UncapturedGovernancePage {
+					lost = append(lost, fmt.Sprintf("%s at block %d of tx %s (%s)", u.Subject, u.Height, u.TxHash, u.Reason))
+				}
+			}
+		}
+		if len(lost) > 0 {
+			r.add(name, CheckSkip, "the node executed the approval on Accumulate but names its governance page proof uncaptured: "+strings.Join(lost, "; ")+" (governance caps at G1)")
+			return false
+		}
 		r.add(name, CheckSkip, "the bundle embeds no Accumulate-executed approval (governance caps at G1)")
 		return false
 	}

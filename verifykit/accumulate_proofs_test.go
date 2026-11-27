@@ -248,10 +248,12 @@ func TestASignatureWithoutAKeyPageProofIsG0(t *testing.T) {
 	if r.GovernanceLevel != "G0" || checkStatus(r, "approval_signatures") != CheckPass || checkStatus(r, "approval_key_pages") != CheckSkip {
 		t.Fatalf("%s: %+v", r.GovernanceLevel, r.Checks)
 	}
-	// one approval of a 2-of-3 page is below the PROVEN threshold
+	// one approval of a 2-of-3 page is below the PROVEN threshold (a bundle the node SEALED with one approval: its hash is its own, so it is
+	// not the anchored leaf, and the one approval is judged against the proven page)
 	r = Verify(context.Background(), accPackage(t, func(b *evidence.EvidenceBundle, _ *accProofs) {
 		b.ApprovalEvidence = b.ApprovalEvidence[:1]
 		b.GovernanceExecution = nil
+		b.BundleHash = mustBundleHash(t, b)
 	}), accOpts(t))
 	if r.GovernanceLevel != "G0" || !strings.Contains(detail(r, "approval_key_pages"), "requires 2") {
 		t.Fatalf("one of two approvals: %s %s", r.GovernanceLevel, detail(r, "approval_key_pages"))
@@ -390,4 +392,14 @@ func TestTheReportNamesTheTrustRootOfItsEmbeddedLevels(t *testing.T) {
 	if r := Verify(context.Background(), accPackage(t, nil), o); r.EmbeddedTrustRoot != nil {
 		t.Fatalf("nothing embedded was credited, yet the report names a trust root: %+v", r.EmbeddedTrustRoot)
 	}
+}
+
+// mustBundleHash is the hash a node that sealed b as it now stands would have stamped on it.
+func mustBundleHash(t *testing.T, b *evidence.EvidenceBundle) [32]byte {
+	t.Helper()
+	h, err := b.ComputeBundleHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
 }

@@ -7,6 +7,7 @@
 package proofreceipt
 
 import (
+	"strings"
 	"testing"
 
 	schema "github.com/opendlt/infrix-schema/proofreceipt"
@@ -71,5 +72,31 @@ func TestFromVerifyReport_NoQuorumWithoutWitness(t *testing.T) {
 	r := FromVerifyReport(rep, VerifyConvertOptions{})
 	if r.Assurance.WitnessQuorumVerified {
 		t.Fatalf("witnessQuorumVerified must be false when witnessCount=0")
+	}
+}
+
+// A verified bundle sealed under bundle hash rule 1 proves no outcome: its receipt names no outcome and says so (main's condition, brief 28cd).
+func TestFromVerifyReport_ARule1BundlesReceiptClaimsNoOutcome(t *testing.T) {
+	rep := &verifykit.Report{Verified: true, ProofLevel: "L3", GovernanceLevel: "G0", Tier: "L3/G0", BundleID: "bundle-1", OutcomeDigestSealed: false}
+	r := FromVerifyReport(rep, VerifyConvertOptions{OutcomeID: "outcome-1"})
+	if r.Artifacts.OutcomeID != "" {
+		t.Fatalf("the receipt claims outcome %q of a rule-1 bundle", r.Artifacts.OutcomeID)
+	}
+	found := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, verifykit.OutcomeNotSealed) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the receipt does not say the outcome is unsealed: %v", r.Warnings)
+	}
+	if err := schema.Validate(r); err != nil {
+		t.Fatalf("receipt must validate: %v", err)
+	}
+	sealed := FromVerifyReport(&verifykit.Report{Verified: true, ProofLevel: "L3", GovernanceLevel: "G0", Tier: "L3/G0", BundleID: "bundle-1", OutcomeDigestSealed: true},
+		VerifyConvertOptions{OutcomeID: "outcome-1"})
+	if sealed.Artifacts.OutcomeID != "outcome-1" {
+		t.Fatalf("a sealed outcome lost its id: %q", sealed.Artifacts.OutcomeID)
 	}
 }

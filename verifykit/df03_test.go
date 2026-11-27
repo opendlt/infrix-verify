@@ -48,6 +48,11 @@ func wasmCorpus(t *testing.T) []wasmCase {
 			b.L0Proof = bytes.Replace(b.L0Proof, []byte(`pin:`), []byte(`pin:0`), 1)
 		})), pin},
 		{"legacy-anchored", enc(buildPortable(t, true)), json.RawMessage(`{}`)},
+		// the outcome digest swapped after sealing, the package's digest and ExportHash with it (brief 28cd, L3124): only bundle_hash catches it
+		{"swapped-outcome-digest", enc(buildPortableWith(t, true, [32]byte{7}, "outcome-vk", nil, func(b *evidence.EvidenceBundle, in *evidence.BuildPortablePackageInputs) {
+			b.OutcomeDigest[0] ^= 1
+			in.OutcomeDigest = b.OutcomeDigest
+		})), json.RawMessage(`{}`)},
 	}
 }
 
@@ -121,6 +126,9 @@ WebAssembly.instantiate(fs.readFileSync(process.argv[3]), go.importObject).then(
 		if levels[name] != want {
 			t.Fatalf("corpus case %s is %s, want %s (all: %v)", name, levels[name], want, levels)
 		}
+	}
+	if levels["swapped-outcome-digest"] != "L0/ungoverned" {
+		t.Fatalf("the swapped outcome digest reached %s", levels["swapped-outcome-digest"])
 	}
 	if !strings.HasPrefix(levels["tampered-chain"], "L3/") {
 		t.Fatalf("the tampered chain reached %s", levels["tampered-chain"])

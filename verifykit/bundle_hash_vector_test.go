@@ -62,8 +62,8 @@ func TestASwappedOutcomeDigestFailsTheBundleHash(t *testing.T) {
 	}
 
 	r := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", nil, swap(false)), Options{})
-	if checkStatus(r, "cryptographic_offline") != CheckPass || checkStatus(r, "outcome_digest_binding") != CheckPass {
-		t.Fatalf("the swap must pass the package gate and the outcome binding, so only the bundle hash catches it: %+v", r.Checks)
+	if checkStatus(r, "cryptographic_offline") != CheckPass || !strings.Contains(detail(r, "outcome_digest_binding"), "not sealed") {
+		t.Fatalf("the swap must pass the package gate (the package's digest equals the bundle's), so only the bundle hash catches it, and the outcome binding names the unsealed digest: %+v", r.Checks)
 	}
 	if r.Verified || checkStatus(r, "bundle_hash") != CheckFail || r.ProofLevel != "L0" || r.GovernanceLevel != "ungoverned" {
 		t.Fatalf("swapped outcome digest: verified=%v %s/%s bundle_hash=%s", r.Verified, r.ProofLevel, r.GovernanceLevel, detail(r, "bundle_hash"))
@@ -102,7 +102,7 @@ func TestALegacyBundleVerifiesWithItsOutcomeDigestReportedUnsealed(t *testing.T)
 	sealedBefore := func(b *evidence.EvidenceBundle) { b.BundleHash = [32]byte{1} } // already sealed: Finalize keeps its (legacy) rule
 	r := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", sealedBefore, nil), Options{})
 	if !r.Verified || r.ProofLevel != "L3" || r.OutcomeDigestSealed || checkStatus(r, "bundle_hash") != CheckPass ||
-		!strings.Contains(detail(r, "bundle_hash"), "LEGACY") || !strings.Contains(detail(r, "outcome_digest_binding"), "NOT sealed") {
+		!strings.Contains(detail(r, "bundle_hash"), "LEGACY") || !strings.Contains(detail(r, "outcome_digest_binding"), OutcomeNotSealed) {
 		t.Fatalf("legacy bundle: verified=%v %s sealed=%v bundle_hash=%s outcome=%s", r.Verified, r.ProofLevel, r.OutcomeDigestSealed,
 			detail(r, "bundle_hash"), detail(r, "outcome_digest_binding"))
 	}
@@ -116,5 +116,44 @@ func TestALegacyBundleVerifiesWithItsOutcomeDigestReportedUnsealed(t *testing.T)
 	}), Options{})
 	if relabelled.Verified || relabelled.OutcomeDigestSealed || checkStatus(relabelled, "bundle_hash") != CheckFail || relabelled.ProofLevel != "L0" {
 		t.Fatalf("relabelled legacy: verified=%v sealed=%v %s bundle_hash=%s", relabelled.Verified, relabelled.OutcomeDigestSealed, relabelled.ProofLevel, detail(relabelled, "bundle_hash"))
+	}
+}
+
+// Main's condition (2026-11-26): for a bundle sealed under bundle hash rule 1 (the legacy rule) no level, receipt line or claim rests on the
+// outcome digest. Such a bundle whose outcome digest was swapped (the package's with it, the ExportHash recomputed) still verifies at exactly
+// the levels of the untouched bundle, the outcome binding names the unsealed outcome instead of passing, and a subsystem-attributed plan binding
+// that rests on the outcome digest alone binds nothing.
+func TestARule1BundlesSwappedOutcomeDigestChangesNoLevelAndIsNamedUnsealed(t *testing.T) {
+	sealedBefore := func(b *evidence.EvidenceBundle) { b.BundleHash = [32]byte{1} }
+	clean := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", sealedBefore, nil), Options{})
+	swapped := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", sealedBefore, func(b *evidence.EvidenceBundle, in *evidence.BuildPortablePackageInputs) {
+		b.OutcomeDigest[0] ^= 1
+		in.OutcomeDigest = b.OutcomeDigest
+	}), Options{})
+	for name, r := range map[string]*Report{"clean": clean, "swapped": swapped} {
+		if !r.Verified || r.Tier != clean.Tier || r.OutcomeDigestSealed {
+			t.Fatalf("%s rule-1 bundle: verified=%v %s (clean %s) sealed=%v", name, r.Verified, r.Tier, clean.Tier, r.OutcomeDigestSealed)
+		}
+		if checkStatus(r, "outcome_digest_binding") == CheckPass || !strings.Contains(detail(r, "outcome_digest_binding"), OutcomeNotSealed) {
+			t.Fatalf("%s rule-1 bundle: the outcome binding claimed the outcome: %s", name, detail(r, "outcome_digest_binding"))
+		}
+	}
+
+	// a subsystem-attributed bundle (no approvals; the plan hash IS the outcome digest) under rule 1: the plan binding rests on the unsealed digest
+	subsystem := func(b *evidence.EvidenceBundle) {
+		b.BundleHash = [32]byte{1}
+		b.ApprovalEvidence = nil
+	}
+	r := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", subsystem, func(b *evidence.EvidenceBundle, in *evidence.BuildPortablePackageInputs) {
+		in.PlanHash = b.OutcomeDigest
+	}), Options{})
+	if r.Verified || checkStatus(r, "plan_hash_binding") != CheckFail || !strings.Contains(detail(r, "plan_hash_binding"), OutcomeNotSealed) {
+		t.Fatalf("rule-1 subsystem-attributed: verified=%v plan_hash_binding=%s", r.Verified, detail(r, "plan_hash_binding"))
+	}
+	// the same bundle under rule 2 binds its plan through its sealed outcome digest
+	r = Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", func(b *evidence.EvidenceBundle) { b.ApprovalEvidence = nil },
+		func(b *evidence.EvidenceBundle, in *evidence.BuildPortablePackageInputs) { in.PlanHash = b.OutcomeDigest }), Options{})
+	if checkStatus(r, "plan_hash_binding") != CheckPass || !r.OutcomeDigestSealed {
+		t.Fatalf("rule-2 subsystem-attributed: plan_hash_binding=%s sealed=%v", detail(r, "plan_hash_binding"), r.OutcomeDigestSealed)
 	}
 }

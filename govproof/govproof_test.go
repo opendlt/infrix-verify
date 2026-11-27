@@ -212,6 +212,26 @@ func TestTSALL_EveryFieldOfTheGovernanceExecutionIsTamperEvident(t *testing.T) {
 	if r := govproof.VerifyGovernance(g, f.Expect, f.opts()); !r.Verified {
 		t.Fatalf("the restored execution no longer verifies: %s", r.Reason)
 	}
+	// the execution's page is the ledger form, which carries no partition anchor (directoryroot.go): a partition anchor present in it, in any field
+	// and under every mutation, makes the execution fail, because a key-page proof takes one form
+	pa := loadDirRoot(t).OtherAnchor
+	g.Page.PartitionAnchor = &pa
+	if r := govproof.VerifyGovernance(g, f.Expect, f.opts()); r.Verified {
+		t.Fatal("a ledger-form page carrying a partition anchor still verifies")
+	}
+	covered["Page.PartitionAnchor"] = true
+	var pms []tamper.Mutation
+	tamper.Mutations(reflect.ValueOf(g.Page.PartitionAnchor).Elem(), "Page.PartitionAnchor", &pms)
+	for _, m := range pms {
+		m.Apply()
+		if r := govproof.VerifyGovernance(g, f.Expect, f.opts()); r.Verified {
+			t.Errorf("%s of %s on a ledger-form page still verifies", m.Kind, m.Path)
+		}
+		covered[tamper.TypePath(m.Path)] = true
+		total++
+		m.Undo()
+	}
+	g.Page.PartitionAnchor = nil
 	if miss := tamper.Missing(reflect.TypeOf(govproof.GovernanceExecution{}), covered); len(miss) > 0 {
 		t.Fatalf("the census found %d field(s) with no effective mutation: %s", len(miss), strings.Join(miss, ", "))
 	}

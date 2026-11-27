@@ -43,10 +43,14 @@ type KeyPageProof struct {
 	// Page and Height are LABELS: the page URL and the block the proof is for. The verifier refuses a proof whose proven page or block differs.
 	Page   string `json:"page"`
 	Height uint64 `json:"height"`
+	// Partition is a LABEL of the directory-root form (directoryroot.go): the partition whose anchor certifies the page's BPT root. The verifier
+	// refuses a proof whose anchor names another partition. Empty in the ledger form.
+	Partition string `json:"partition,omitempty"`
 	// PageState is the key page's state in the partition BPT; LedgerState the partition's system ledger in the same BPT. LedgerState.Chain names the
-	// ledger's root chain.
-	PageState   l0proof.AccountProof `json:"pageState"`
-	LedgerState l0proof.AccountProof `json:"ledgerState"`
+	// ledger's root chain. The directory-root form carries no ledger (LedgerState empty and omitted) and carries PartitionAnchor instead.
+	PageState       l0proof.AccountProof `json:"pageState"`
+	LedgerState     l0proof.AccountProof `json:"ledgerState,omitzero"`
+	PartitionAnchor *PartitionAnchor     `json:"partitionAnchor,omitempty"`
 	// Directory carries the partition BPT root into the Directory BPT root.
 	Directory l0proof.DirectoryHop `json:"directory"`
 	// Consensus is the trace of Directory light blocks from the pin; the last certifies the Directory root as its AppHash.
@@ -80,12 +84,19 @@ type KeyPageResult struct {
 	Reason          string
 	Pin             string
 	PinOverridden   bool
+	// Form is FormLedger or FormDirectoryRoot.
+	Form            string
 	Page            KeyPage
 	Partition       string // the partition's system ledger URL
-	Height          uint64 // the partition block, read from the proven ledger
-	BlockTime       int64  // the partition block's time (Unix seconds), read from the proven ledger
-	RootAnchor      []byte // the partition's root-chain anchor at that block, read from the proven ledger
+	Height          uint64 // the partition block, read from the proven ledger (or, in the directory-root form, from the partition's anchor)
+	BlockTime       int64  // the partition block's time (Unix seconds), read from the proven ledger; 0 and named in Unproven when not proven
+	RootAnchor      []byte // the partition's root-chain anchor at that block, read from the proven ledger; nil in the directory-root form
 	DirectoryHeight int64
+	// HeightProvenBy names what proves Height in the directory-root form (HeightByPartitionAnchor); empty in the ledger form, where the proven
+	// ledger states it.
+	HeightProvenBy string
+	// Unproven names what the proof does not establish and the verifier therefore does not claim (UnprovenBlockTime in the directory-root form).
+	Unproven []string
 }
 
 func failKP(r KeyPageResult, format string, args ...any) KeyPageResult {
@@ -153,6 +164,12 @@ func VerifyKeyPage(p *KeyPageProof, opts l0proof.Options) KeyPageResult {
 	if p.PageState.Chain != 0 {
 		return failKP(res, "the page proof names chain %d; it hands no chain up and must name 0", p.PageState.Chain)
 	}
+	if p.PartitionAnchor != nil || emptyAccountProof(&p.LedgerState) {
+		return verifyAtDirectoryRoot(p, res, pin, lim, ps, page, keyHashes)
+	}
+	if p.Partition != "" {
+		return failKP(res, "the ledger form names no partition label (the proven ledger names the partition); this proof names %q", p.Partition)
+	}
 	if p.LedgerState.Chain != ledgerRootChain {
 		return failKP(res, "the ledger proof names chain %d, not the root chain (%d)", p.LedgerState.Chain, ledgerRootChain)
 	}
@@ -187,6 +204,7 @@ func VerifyKeyPage(p *KeyPageProof, opts l0proof.Options) KeyPageResult {
 		return failKP(res, "the Directory root %X is not the AppHash %X of the certified header at height %d", dirRoot, []byte(last.Header.AppHash), last.Header.Height)
 	}
 	res.Verified = true
+	res.Form = FormLedger
 	res.Page = KeyPage{URL: page.URL, AcceptThreshold: page.AcceptThreshold, Version: page.Version, KeyHashes: keyHashes}
 	res.Partition, res.Height, res.BlockTime = ledger.URL, ledger.Index, ledger.Time
 	res.RootAnchor = append([]byte(nil), p.LedgerState.Chains[p.LedgerState.Chain]...)
@@ -306,6 +324,11 @@ func VerifyGovernance(g *GovernanceExecution, exp GovernanceExpectation, opts l0
 	kp := VerifyKeyPage(&g.Page, opts)
 	if !kp.Verified {
 		return failGov("governance page: %s", kp.Reason)
+	}
+	if kp.Form != FormLedger {
+		// a page at a Directory-recorded root proves no root-chain anchor, so it cannot show the page at the executing block (main's ruling: G2
+		// only with the page proof at the executing block)
+		return failGov("the governance page is proven at a Directory-recorded root (block %d), not at the block that executed the transaction; G2 needs the page with its ledger at the executing block", kp.Height)
 	}
 	if !strings.EqualFold(kp.Page.URL, exp.Page) {
 		return failGov("the page proof is for %s, not the governance page %s", kp.Page.URL, exp.Page)

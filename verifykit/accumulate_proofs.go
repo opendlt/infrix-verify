@@ -253,6 +253,13 @@ func (r *Report) checkApprovalKeyPages(bundle *evidence.EvidenceBundle, approval
 			r.add(name, CheckSkip, fmt.Sprintf("%d distinct key(s) of %s approved; the proven page requires %d (governance caps at G0)", len(signers[k]), p.Page.URL, p.Page.AcceptThreshold))
 			return false
 		}
+		if p.Form == govproof.FormDirectoryRoot {
+			// the page at a Directory-recorded root (core L3168): the height is credited exactly as the partition's anchor states it, and what the
+			// proof does not establish is named UNPROVEN, never claimed
+			met = append(met, fmt.Sprintf("%s %d-of-%d at a Directory-recorded root of %s, block %d (proven by %s; %s UNPROVEN)", p.Page.URL, len(signers[k]),
+				p.Page.AcceptThreshold, p.Partition, p.Height, p.HeightProvenBy, strings.Join(p.Unproven, ", ")))
+			continue
+		}
 		met = append(met, fmt.Sprintf("%s %d-of-%d at block %d", p.Page.URL, len(signers[k]), p.Page.AcceptThreshold, p.Height))
 	}
 	if len(pages) != len(signers) {

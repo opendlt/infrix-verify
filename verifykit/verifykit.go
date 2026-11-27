@@ -138,6 +138,12 @@ type Report struct {
 	//     proven block, which excludes backdating; that is why G2 is the higher level (main ruling 2026-11-26).
 	GovernanceBinding string `json:"governanceBinding,omitempty"`
 
+	// OutcomeDigestSealed reports that the bundle's outcome digest (with its anchor candidate digest, plan content hash and sealed block
+	// height) is covered by the BundleHash this verifier recomputed and held to the stored one (brief 28cd, L3124). False for a bundle
+	// sealed under the legacy hash rule, whose outcome digest is bound to the package but not sealed into the bundle's hash: only a matching
+	// replay proves such a bundle's outcome.
+	OutcomeDigestSealed bool `json:"outcomeDigestSealed"`
+
 	// platform-review-3 Epic 2: the layered verification truth, identical
 	// to the fields the Nexus proof inspector surfaces. CryptographicallyVerified
 	// is the offline binding gate; L0Verified is the live anchor
@@ -434,6 +440,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 	// evidence chain or outcome digest does not recompute proves nothing, whatever else it carries.
 	if !report.integrityHolds() {
 		proof, gov = assurance.ProofLevelNone, assurance.GovernanceLevelUngoverned
+		report.OutcomeDigestSealed = false
 	}
 	report.finalizeLevels(proof, gov, opts.Require)
 	switch gov {
@@ -596,10 +603,12 @@ func (r *Report) checkPlanHashBinding(pkg *evidence.PortableEvidencePackage, bun
 	r.add("plan_hash_binding", CheckFail, "PlanHash has no binding witness in the bundle")
 }
 
-// checkBundleHash recomputes the bundle's hash over its sealed content and holds the stored BundleHash to it (brief 28cd, L3124). The hash covers
-// the outcome digest, the anchor candidate digest, the plan content hash, the sealed block height and every step's per-category gas, so a bundle
-// whose outcome digest was swapped after it was sealed fails here; one whose stored BundleHash was rewritten to match fails anchor_proof, where
-// the anchored batch root still holds the sealed hash.
+// checkBundleHash recomputes the bundle's hash over its sealed content and holds the stored BundleHash to it (brief 28cd, L3124). Under the
+// rule every bundle is sealed under (BundleHashRuleSealedDigests) the hash covers the outcome digest, the anchor candidate digest, the plan
+// content hash, the sealed block height and every step's per-category gas, so a bundle whose outcome digest was swapped after it was sealed
+// fails here, and one whose stored BundleHash was rewritten to match fails anchor_proof, where the anchored batch root still holds the sealed
+// hash. A bundle sealed under the legacy rule (anchored before the rule existed) recomputes under it and passes, and the check says what that
+// rule leaves unsealed; OutcomeDigestSealed stays false for it.
 func (r *Report) checkBundleHash(bundle *evidence.EvidenceBundle, ok bool) {
 	if !ok {
 		r.add("bundle_hash", CheckFail, "bundle did not parse")
@@ -612,6 +621,10 @@ func (r *Report) checkBundleHash(bundle *evidence.EvidenceBundle, ok bool) {
 	}
 	if got != bundle.BundleHash {
 		r.add("bundle_hash", CheckFail, fmt.Sprintf("the bundle's content hashes to %x…, not its sealed BundleHash %x… (the bundle was changed after it was sealed)", got[:8], bundle.BundleHash[:8]))
+		return
+	}
+	if !bundle.BundleHashCoversSealedDigests() {
+		r.add("bundle_hash", CheckPass, "the content recomputes to BundleHash under the LEGACY rule the bundle was sealed under, which does not cover its outcome digest, plan content hash or sealed height (the outcome is proven only by a matching replay)")
 		return
 	}
 	r.add("bundle_hash", CheckPass, "the sealed content (outcome digest, anchor candidate, plan content hash, sealed height, step gas) recomputes to BundleHash")
@@ -630,7 +643,22 @@ func (r *Report) checkOutcomeDigestBinding(pkg *evidence.PortableEvidencePackage
 		r.add("outcome_digest_binding", CheckFail, "OutcomeDigest does not match the embedded bundle")
 		return
 	}
-	r.add("outcome_digest_binding", CheckPass, "outcome digest bound to the bundle")
+	if checkStatusOf(r, "bundle_hash") == CheckPass && bundle.BundleHashCoversSealedDigests() {
+		r.OutcomeDigestSealed = true
+		r.add("outcome_digest_binding", CheckPass, "outcome digest bound to the bundle and sealed into its BundleHash")
+		return
+	}
+	r.add("outcome_digest_binding", CheckPass, "outcome digest bound to the bundle; NOT sealed into its BundleHash (legacy hash rule)")
+}
+
+// checkStatusOf is the status of the named check, or "" when it has not run.
+func checkStatusOf(r *Report, name string) CheckStatus {
+	for _, c := range r.Checks {
+		if c.Name == name {
+			return c.Status
+		}
+	}
+	return ""
 }
 
 func (r *Report) checkEvidenceChain(pkg *evidence.PortableEvidencePackage) {

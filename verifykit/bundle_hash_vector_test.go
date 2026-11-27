@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/opendlt/infrix-schema/evidence"
@@ -20,8 +21,8 @@ import (
 // infrix-core (pkg/evidence/bundle_hash_vector_test.go). This verifier (and the WASM build, the same body) recomputes BundleHash with the
 // schema it pins, so a pin that drifts from the rule fails here.
 const (
-	bundleHashVectorJSON = `{"id":"ev-vector","type":"evidence_bundle","intentId":"intent-vector","planId":"plan-vector","outcomeId":"outcome-vector","outcomeRecordId":"outcome-vector","chain":{"intentId":"intent-vector","links":null,"stateRoot":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"chainHash":[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],"createdAt":"2026-11-26T12:00:00Z"},"stateRoot":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"anchorStatus":"unanchored","planContentHash":[14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14],"anchorCandidateDigest":[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"level":"anchored","policyDecisions":[{"timestamp":"2026-11-26T12:00:00Z","policyType":"intent:transfer","scopeKey":"acc://a.acme","decision":"allow","ruleId":"r1","auditMsg":"","blockHeight":9}],"approvalEvidence":[{"stageId":"s1","identity":"acc://a.acme","role":"approver","planHash":[11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],"signedAt":"2026-11-26T12:00:00Z"}],"stepOutcomes":[{"stageId":"s1","plannedGas":1000,"actualGas":1000,"gasDrift":-0.1,"status":"success","outputHash":[13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13],"ghostStatusMatch":false,"gasConsumed":900,"gasByCategory":{"compute":250,"crypto":50,"storage":600}}],"bundleHash":[103,115,162,217,99,76,171,206,231,169,61,86,42,203,244,12,12,117,134,110,149,181,129,163,220,126,241,171,218,239,177,44],"chainVerified":false,"outcomeDigest":[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"sealedBlockHeight":4242,"state":"created","createdAt":"2026-11-26T12:00:00Z","updatedAt":"2026-11-26T12:00:00Z"}`
-	bundleHashVectorHex  = "6773a2d9634cabcee7a93d562acbf40c0c75866e95b581a3dc7ef1abdaefb12c"
+	bundleHashVectorJSON = `{"id":"ev-vector","type":"evidence_bundle","intentId":"intent-vector","planId":"plan-vector","outcomeId":"outcome-vector","outcomeRecordId":"outcome-vector","chain":{"intentId":"intent-vector","links":null,"stateRoot":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"chainHash":[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],"createdAt":"2026-11-26T12:00:00Z"},"stateRoot":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"anchorStatus":"unanchored","planContentHash":[14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14],"anchorCandidateDigest":[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"level":"anchored","policyDecisions":[{"timestamp":"2026-11-26T12:00:00Z","policyType":"intent:transfer","scopeKey":"acc://a.acme","decision":"allow","ruleId":"r1","auditMsg":"","blockHeight":9}],"approvalEvidence":[{"stageId":"s1","identity":"acc://a.acme","role":"approver","planHash":[11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],"signedAt":"2026-11-26T12:00:00Z"}],"stepOutcomes":[{"stageId":"s1","plannedGas":1000,"actualGas":1000,"gasDrift":-0.1,"status":"success","outputHash":[13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13],"ghostStatusMatch":false,"gasConsumed":900,"gasByCategory":{"compute":250,"crypto":50,"storage":600}}],"bundleHash":[66,205,16,14,35,33,114,106,172,61,236,254,58,64,132,226,86,87,216,223,57,174,158,196,26,107,207,159,14,126,254,150],"chainVerified":false,"bundleHashRule":2,"outcomeDigest":[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"sealedBlockHeight":4242,"state":"created","createdAt":"2026-11-26T12:00:00Z","updatedAt":"2026-11-26T12:00:00Z"}`
+	bundleHashVectorHex  = "42cd100e2321726aac3decfe3a4084e25657d8df39ae9ec41a6bcf9f0e7efe96"
 )
 
 func TestTheSharedBundleHashVectorRecomputesUnderThePinnedSchema(t *testing.T) {
@@ -91,5 +92,29 @@ func TestAStepsGasCategoriesAreCoveredByTheBundleHash(t *testing.T) {
 	}), Options{})
 	if moved.Verified || checkStatus(moved, "bundle_hash") != CheckFail {
 		t.Fatalf("gas moved between categories: verified=%v bundle_hash=%s", moved.Verified, detail(moved, "bundle_hash"))
+	}
+}
+
+// A bundle sealed and anchored under the legacy rule (before 28cd) still verifies at its level, and the report says exactly what that rule
+// leaves unsealed: OutcomeDigestSealed is false and the checks name the legacy rule. A bundle sealed under the current rule and relabelled
+// legacy no longer recomputes to its stored hash and proves nothing.
+func TestALegacyBundleVerifiesWithItsOutcomeDigestReportedUnsealed(t *testing.T) {
+	sealedBefore := func(b *evidence.EvidenceBundle) { b.BundleHash = [32]byte{1} } // already sealed: Finalize keeps its (legacy) rule
+	r := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", sealedBefore, nil), Options{})
+	if !r.Verified || r.ProofLevel != "L3" || r.OutcomeDigestSealed || checkStatus(r, "bundle_hash") != CheckPass ||
+		!strings.Contains(detail(r, "bundle_hash"), "LEGACY") || !strings.Contains(detail(r, "outcome_digest_binding"), "NOT sealed") {
+		t.Fatalf("legacy bundle: verified=%v %s sealed=%v bundle_hash=%s outcome=%s", r.Verified, r.ProofLevel, r.OutcomeDigestSealed,
+			detail(r, "bundle_hash"), detail(r, "outcome_digest_binding"))
+	}
+
+	current := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", nil, nil), Options{})
+	if !current.Verified || !current.OutcomeDigestSealed {
+		t.Fatalf("current-rule bundle: verified=%v sealed=%v", current.Verified, current.OutcomeDigestSealed)
+	}
+	relabelled := Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", nil, func(b *evidence.EvidenceBundle, _ *evidence.BuildPortablePackageInputs) {
+		b.BundleHashRule = evidence.BundleHashRuleLegacy
+	}), Options{})
+	if relabelled.Verified || relabelled.OutcomeDigestSealed || checkStatus(relabelled, "bundle_hash") != CheckFail || relabelled.ProofLevel != "L0" {
+		t.Fatalf("relabelled legacy: verified=%v sealed=%v %s bundle_hash=%s", relabelled.Verified, relabelled.OutcomeDigestSealed, relabelled.ProofLevel, detail(relabelled, "bundle_hash"))
 	}
 }

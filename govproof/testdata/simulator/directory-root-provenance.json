@@ -1,0 +1,5 @@
+{
+  "command": "cd l0proofref \u0026\u0026 GOVPROOF_WRITE_FIXTURES=1 go test -count=1 -run TestSimulatorDirectoryRootFixture .",
+  "label": "SIMULATOR fixture: verified only against its own pin passed explicitly; never a Kermit claim",
+  "source": "the in-process Accumulate simulator (gitlab.com/Jason_Gregoire/accumulate test/simulator), two BVNs retaining BPT history: a page signs once, both partitions close blocks, and the page is proven from its historical state proof at the latest BPT root its partition anchored on the Directory, bound by the partition's BlockValidatorAnchor on the Directory anchor pool's main chain; Directory headers synthesized over the real Directory BPT root and signed by validator keys derived from the label govproof-simulator"
+}

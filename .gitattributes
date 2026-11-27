@@ -5,3 +5,5 @@ credverify/testdata/** -text
 # The shared state root vectors are pinned by SHA-256 over their LF bytes (stateroot_test.go refuses a file that carries a carriage return, naming this line):
 # core.autocrlf=true on a Windows checkout would rewrite them and fail the pin.
 stateroot/testdata/*.json text eol=lf
+# The l0proof fixtures are captured artifacts; keep their bytes as captured.
+l0proof/testdata/** text eol=lf

@@ -51,7 +51,16 @@ func buildPortable(t *testing.T, anchored bool) *evidence.PortableEvidencePackag
 // buildPortableFor builds the same bundle with the state root and the outcome id the caller names (the outcome id is the consumer a state root proof is bound to).
 func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID string) *evidence.PortableEvidencePackage {
 	t.Helper()
-	planHash := sha256.Sum256([]byte("vk-plan"))
+	return buildPortableWith(t, anchored, stateRoot, outcomeID, nil, nil)
+}
+
+// buildPortableWith builds the same bundle, letting pre change the bundle before it is sealed (Finalize) and post change the sealed
+// bundle and the package inputs before the package is built and its ExportHash computed: a tamper the node could make and still
+// produce a package whose offline integrity gate passes.
+func buildPortableWith(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID string,
+	pre func(*evidence.EvidenceBundle), post func(*evidence.EvidenceBundle, *evidence.BuildPortablePackageInputs)) *evidence.PortableEvidencePackage {
+	t.Helper()
+	planHash := planHashVK()
 	outcomeDigest := sha256.Sum256([]byte("vk-outcome-canonical"))
 
 	// Hash-linked evidence chain.
@@ -70,7 +79,8 @@ func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID
 		StateRoot:         stateRoot,
 		OutcomeID:         outcomeID,
 		PolicyDecisions:   []evidence.DecisionProofRef{{PolicyType: "transfer", RuleID: "allow", Decision: "allow", BlockHeight: 1}},
-		ApprovalEvidence:  []evidence.ApprovalEvidenceRef{{StageID: "s1", Identity: "acc://approver.acme", Role: "approver", PlanHash: planHash}},
+		PolicyEvaluations: []evidence.PolicyEvaluation{transferEvaluation(t, transferPolicy(), 50)},
+		ApprovalEvidence:  []evidence.ApprovalEvidenceRef{signedApproval(t, evidence.ApprovalSigTypeInfrixEd25519, planHash)},
 		ExternalProofs:    []evidence.ExternalProofRef{{SourceChain: "acc", ProofType: "groth16", Verified: true}},
 		OutcomeDigest:     outcomeDigest,
 		SealedBlockHeight: 100,
@@ -81,8 +91,31 @@ func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID
 		bundle.AnchorBlock = 4242
 		bundle.AnchorRecordID = "anchor-rec-vk"
 	}
+	bundle.PlanContentHash = planContentVK()
+	if pre != nil {
+		pre(bundle)
+	}
+	// the plan the approvals signed binds the evaluations it was governed under (brief 28bu row 2): a pre that governs the plan under other
+	// evaluations is a node that planned under them, so the approvals signed over the default binding are re-signed over the new one
+	if bound := evidence.BindPlanHash(bundle.PlanContentHash, bundle.PolicyEvaluations); bound != planHash {
+		for i, ae := range bundle.ApprovalEvidence {
+			if ae.PlanHash == planHash && ae.SigType != "" {
+				bundle.ApprovalEvidence[i] = signedApproval(t, ae.SigType, bound)
+			}
+		}
+		planHash = bound
+	}
 	if err := bundle.Finalize(); err != nil {
 		t.Fatalf("bundle.Finalize: %v", err)
+	}
+	if anchored {
+		// the bundle is leaf 1 of a 3-leaf batch, as the batch-at-block anchorer writes it
+		batch := [][32]byte{sha256.Sum256([]byte("other bundle 0")), bundle.BundleHash, sha256.Sum256([]byte("other bundle 2"))}
+		incl, err := evidence.GenerateAnchorInclusion(batch, 1)
+		if err != nil {
+			t.Fatalf("GenerateAnchorInclusion: %v", err)
+		}
+		bundle.AnchorInclusion = incl
 	}
 
 	bundleData, err := evidence.CanonicalJSON(bundle)
@@ -118,6 +151,13 @@ func buildPortableFor(t *testing.T, anchored bool, stateRoot [32]byte, outcomeID
 		in.AnchorBlock = bundle.AnchorBlock
 	}
 
+	if post != nil {
+		post(bundle, &in)
+		in.BundleData, err = evidence.CanonicalJSON(bundle)
+		if err != nil {
+			t.Fatalf("canonicalize bundle: %v", err)
+		}
+	}
 	pkg, err := evidence.BuildPortablePackageWithBindings(in)
 	if err != nil {
 		t.Fatalf("BuildPortablePackageWithBindings: %v", err)
@@ -211,11 +251,12 @@ func TestVerifyKitWithholdsG2FromSelfAssertedCredential(t *testing.T) {
 	if r.ProofLevel != "L4" {
 		t.Errorf("proofLevel = %q, want L4 (L0-confirmed anchor)", r.ProofLevel)
 	}
-	if r.GovernanceLevel != "G1" {
-		t.Errorf("governanceLevel = %q, want G1 (credential proof is self-asserted, not independently verified)", r.GovernanceLevel)
+	// G0: the approval is signed but its key is not proven on its page (brief 28bh), and the credential is self-asserted; never G2
+	if r.GovernanceLevel != "G0" {
+		t.Errorf("governanceLevel = %q, want G0 (self-asserted credential, and no key-page proof)", r.GovernanceLevel)
 	}
-	if r.Tier != "L4/G1" {
-		t.Errorf("tier = %q, want L4/G1", r.Tier)
+	if r.Tier != "L4/G0" {
+		t.Errorf("tier = %q, want L4/G0", r.Tier)
 	}
 	if r.AssuranceClass == "high_assurance" {
 		t.Errorf("assuranceClass = %q; a self-asserted credential must not reach high_assurance (DX P0-5b)", r.AssuranceClass)
@@ -244,11 +285,10 @@ func TestVerifyKitCreditsG2WhenExternalProofIndependentlyConfirmed(t *testing.T)
 	if !withConf.Verified {
 		t.Fatalf("should verify: %+v", withConf.Checks)
 	}
-	if withConf.GovernanceLevel != "G2" {
-		t.Errorf("governanceLevel = %q, want G2 (external proof independently confirmed + anchored)", withConf.GovernanceLevel)
-	}
-	if withConf.Tier != "L4/G2" {
-		t.Errorf("tier = %q, want L4/G2", withConf.Tier)
+	// a confirmed credential is necessary for G2 when one is referenced, never sufficient: this bundle has no key-page proof and no
+	// Accumulate-executed approval (brief 28bh); the positive G2 is TestAccumulateProvenBundleReachesL4G2Offline
+	if withConf.GovernanceLevel != "G0" || checkStatus(withConf, "external_proof") != CheckPass {
+		t.Errorf("governanceLevel = %q external_proof = %s, want G0 with the credential confirmed", withConf.GovernanceLevel, checkStatus(withConf, "external_proof"))
 	}
 
 	// Without the confirmer, the self-asserted flag must NOT reach G2.
@@ -264,7 +304,7 @@ func TestVerifyKitRequireLevelFailsClosed(t *testing.T) {
 	// independently confirmable (L4), but the credential proof is self-asserted
 	// so governance caps at G1 until independent credential verification lands
 	// (credverify, DX P1-4 / see P0-5b).
-	req, err := ParseRequiredLevel("L4/G1")
+	req, err := ParseRequiredLevel("L4/G0") // the approval key is not proven on its page, so G0 is this bundle's honest governance (brief 28bh)
 	if err != nil {
 		t.Fatalf("ParseRequiredLevel: %v", err)
 	}

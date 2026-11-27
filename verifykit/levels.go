@@ -11,83 +11,71 @@ import (
 	"github.com/opendlt/infrix-schema/evidence"
 )
 
-// computeProofLevel maps the verified anchor state onto the canonical
-// proof ladder. The portable bundle carries L0-settlement evidence (an
-// anchored batch + the L0 tx); storage/account inclusion (L1/L2) require
-// state proofs that are not part of a portable evidence package, so the
-// kit reports the HIGHEST layer it can independently witness:
+// computeProofLevel maps what this verifier proved onto the canonical proof ladder (infrix-schema assurance). Integrity (the export hash,
+// the plan binding, the evidence chain, the outcome digest) is a precondition of every level, not a level. The kit reports the HIGHEST
+// rung it independently witnessed:
 //
-//   - L4 (L0 settlement): the bundle is anchored AND the anchor tx was
-//     independently confirmed on live L0.
-//   - L3 (batch inclusion): the bundle is anchored (a valid anchor proof
-//     binds it to a batch) but L0 was not consulted (no endpoint).
-//   - L0 (none): the bundle is not anchored.
+//   - L4 (L0 settlement): the bundle is anchored AND its batch root is proven on Accumulate: by the embedded L0 proof chain verified against the
+//     verifier's own pin (source embedded-proof, checkEmbeddedL0Proof) or by a live query of the anchor tx (source live-query).
+//   - L3 (batch inclusion): the bundle hash this verifier recomputes is proven by Merkle inclusion into the batch root the anchor record
+//     names (checkAnchorProof). The node-set anchorStatus field is never read for it (brief 28bd row 2, L2992).
+//   - L2 (account inclusion): every claimed storage key is proven in its contract root AND that contract root is proven to be the
+//     contract's leaf in the bundle's state root, the root BundleHash commits to (checkStateInclusion, brief 28bd phase 2b).
+//   - L1 (storage inclusion): every claimed storage key is proven in its contract root.
+//   - L0 (none): nothing above.
 //
-// This is deliberately conservative: without a live L0 endpoint the kit
-// will not claim L4 even for an anchored bundle.
-func computeProofLevel(anchored, l0Confirmed bool) assurance.ProofLevel {
+// The source of an L4 is recorded beside the level (Report.ProofLevelSource). Offline verification claims L4 only from an embedded, pinned,
+// fully verified proof chain, and never from node output (operator decision 2026-11-26, L2992).
+func computeProofLevel(storage, account, anchored, l0Confirmed bool) assurance.ProofLevel {
 	switch {
 	case anchored && l0Confirmed:
 		return assurance.ProofLevelL0Settlement
 	case anchored:
 		return assurance.ProofLevelBatchInclusion
+	case storage && account:
+		return assurance.ProofLevelAccountInclusion
+	case storage:
+		return assurance.ProofLevelStorageInclusion
 	default:
 		return assurance.ProofLevelNone
 	}
 }
 
-// computeGovernanceLevel classifies how strongly the operation was
-// governed, read entirely from the verified bundle:
+// computeGovernanceLevel classifies how strongly the operation was governed (native proof plan section 3):
 //
-//   - G0 (policy passed): the bundle records at least one policy decision
-//     and none of them denied.
-//   - G1 (threshold approved): G0 plus signed approval evidence bound to
-//     the plan hash.
-//   - G2 (credentialed + anchored): G1 plus an INDEPENDENTLY confirmed
-//     external/credential proof and an anchored bundle. G2 is credited only when
-//     `externalProofConfirmed` is true — i.e. an injected ExternalProofConfirmer
-//     re-read the proof from its source (DX P1-4). It is NEVER credited from the
-//     self-asserted evidence.ExternalProofRef.Verified flag (DX P0-5b).
+//   - G0 (policy passed): `policyAllowed`: this verifier re-ran every content-addressed policy the bundle says its plan was decided under, with the
+//     node's own evaluator body, and every one allows (checkPolicyReevaluation, brief 28bi). A recorded decision is never credited; a recorded denial
+//     still makes the bundle ungoverned. The ladder is cumulative: G1 needs G0, G2 needs G1 (main ruling 2026-11-26).
+//   - G1 (threshold approved): G0 plus `approvalsProven`: every approval's signature verified by this verifier over the package's plan hash under its
+//     declared scheme (checkApprovalSignatures, brief 28bd row 1) AND every approver key proven on the key page its preimage names, at the page version it
+//     signed against, with each page's threshold computed from the PROVEN page (checkApprovalKeyPages, brief 28bh). An identity string, an unsigned
+//     approval, or a signature whose key is not proven on its page caps the bundle at G0.
+//   - G2 (credentialed + anchored): G1 plus `governanceExecuted`: Accumulate itself executed the M-of-N approval of this plan for this bundle under the
+//     relying party's governance page, its inclusion proven to a certified Directory root (checkGovernanceExecution); plus an anchored-by-proof bundle;
+//     plus, when the bundle references an external or credential proof, that proof INDEPENDENTLY confirmed (an injected ExternalProofConfirmer). A node-set
+//     outcome, an ExternalProofRef.Verified flag (DX P0-5b) or a recorded success is never read (NL-06).
 //   - ungoverned: anything less.
-func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed bool, externalProofConfirmed bool) assurance.GovernanceLevel {
+func computeGovernanceLevel(bundle *evidence.EvidenceBundle, parsed, policyAllowed, approvalsProven, governanceExecuted, externalProofConfirmed, anchored bool) assurance.GovernanceLevel {
 	if !parsed {
 		return assurance.GovernanceLevelUngoverned
 	}
-
-	policyAllowed := false
 	for _, d := range bundle.PolicyDecisions {
 		if isDeny(d.Decision) {
 			// A recorded denial means the operation was not cleanly
 			// governed-and-allowed; do not credit G0.
 			return assurance.GovernanceLevelUngoverned
 		}
-		policyAllowed = true
 	}
 	if !policyAllowed {
 		return assurance.GovernanceLevelUngoverned
 	}
 
-	hasSignedApproval := false
-	for _, ae := range bundle.ApprovalEvidence {
-		if ae.PlanHash != ([32]byte{}) && ae.Identity != "" {
-			hasSignedApproval = true
-			break
-		}
-	}
-	if !hasSignedApproval {
+	if !approvalsProven {
 		return assurance.GovernanceLevelPolicyPassed
 	}
 
-	// G2 (credentialed + anchored) requires an INDEPENDENTLY confirmed external/
-	// credential proof AND an anchored bundle. `externalProofConfirmed` is set by
-	// the caller only when an injected ExternalProofConfirmer re-read the proof
-	// from its source chain (checkExternalProof) — never from the self-asserted
-	// evidence.ExternalProofRef.Verified flag, which would trust the producing
-	// node (the exact property this "no node trust" kit refutes, DX P0-5b/P1-4).
-	// With no confirmer, externalProofConfirmed is false and governance caps at
-	// G1 — the honest default.
-	anchored := bundle.Anchor == evidence.AnchorStatusAnchored || bundle.Anchor == evidence.AnchorStatusVerified
-	if externalProofConfirmed && anchored {
+	credentialsConfirmed := len(bundle.ExternalProofs) == 0 || externalProofConfirmed
+	if governanceExecuted && anchored && credentialsConfirmed {
 		return assurance.GovernanceLevelCredentialedAnchored
 	}
 	return assurance.GovernanceLevelThresholdApproved

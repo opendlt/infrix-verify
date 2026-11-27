@@ -1,0 +1,29 @@
+{
+  "network": "simulator",
+  "chainId": "Simulator.Directory",
+  "initialHeight": 1,
+  "genesisTime": {
+    "seconds": 1656633600,
+    "nanos": 0
+  },
+  "validators": {
+    "validators": [
+      {
+        "pubKey": "6515286bd71d801f8071b00d2bcf8ed385c88956bf18ce50dae9a3937b1b4712",
+        "votingPower": 10
+      },
+      {
+        "pubKey": "8e428e1b63485a990a3de70f34bd7683052ef7760da50215d045a5c27b196235",
+        "votingPower": 10
+      },
+      {
+        "pubKey": "c18595ef4faace046e3062065f92e6c44b6044bba0782a44486188327d968cc3",
+        "votingPower": 10
+      },
+      {
+        "pubKey": "57a768baaa9baa9f3fe92512c5a98bd40100c59b62a4d24b270fe9d75d505a0c",
+        "votingPower": 10
+      }
+    ]
+  }
+}

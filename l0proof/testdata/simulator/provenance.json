@@ -1,0 +1,5 @@
+{
+  "command": "cd l0proofref \u0026\u0026 L0PROOF_WRITE_FIXTURES=1 go test -count=1 -run TestSimulatorFixture .",
+  "label": "SIMULATOR fixture: verified only against its own pin passed explicitly; never a Kermit claim",
+  "source": "the in-process Accumulate simulator (gitlab.com/Jason_Gregoire/accumulate test/simulator), one BVN; Directory headers synthesized over its real Directory BPT root and signed by validator keys derived from the label l0proof-simulator"
+}

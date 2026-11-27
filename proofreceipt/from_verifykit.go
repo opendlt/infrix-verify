@@ -79,10 +79,17 @@ func FromVerifyReport(rep *verifykit.Report, opts VerifyConvertOptions) *schema.
 		WitnessQuorumVerified: rep.WitnessVerified && rep.WitnessCount > 0,
 	}
 
+	// a bundle whose BundleHash does not cover its outcome digest (bundle hash rule 1, the legacy rule) proves no outcome, so the receipt names
+	// none and says so (brief 28cd, L3124, main's condition)
+	outcomeID := opts.OutcomeID
+	if rep.Verified && !rep.OutcomeDigestSealed {
+		outcomeID = ""
+		r.Warnings = append(r.Warnings, verifykit.OutcomeNotSealed+": the bundle's hash does not cover its outcome digest or step gas, so this receipt claims no outcome")
+	}
 	r.Artifacts = schema.Artifacts{
 		IntentID:   firstNonEmpty(opts.IntentID, rep.IntentID),
 		PlanID:     opts.PlanID,
-		OutcomeID:  opts.OutcomeID,
+		OutcomeID:  outcomeID,
 		EvidenceID: firstNonEmpty(opts.EvidenceID, rep.BundleID),
 		AnchorTx:   opts.AnchorTx,
 	}

@@ -198,3 +198,38 @@ func PageAtAnchor(ctx context.Context, q api.Querier2, page *url.URL, partition 
 	}
 	return &govproof.KeyPageProof{Page: page.String(), Height: block, Partition: partition, PageState: pp}, nil
 }
+
+// PartitionAnchorAt is the BlockValidatorAnchor from partition the Directory executed for exactly minor block block.
+func PartitionAnchorAt(ctx context.Context, q api.Querier2, partition string, block uint64) (*protocol.Transaction, *protocol.BlockValidatorAnchor, error) {
+	pool := protocol.DnUrl().JoinPath(protocol.AnchorPool)
+	source := protocol.PartitionUrl(partition)
+	const page = 64
+	for start := uint64(0); ; start += page {
+		r, err := q.QueryMainChainEntries(ctx, pool, &api.ChainQuery{Name: "main", Range: &api.RangeOptions{FromEnd: true, Start: start, Count: api.Ptr[uint64](page), Expand: api.Ptr(true)}})
+		if err != nil {
+			return nil, nil, fmt.Errorf("query the Directory anchor pool's main chain: %w", err)
+		}
+		for j := len(r.Records) - 1; j >= 0; j-- {
+			v := r.Records[j].Value
+			if v == nil || v.Message == nil || v.Message.Transaction == nil {
+				continue
+			}
+			if a, ok := v.Message.Transaction.Body.(*protocol.BlockValidatorAnchor); ok && a.Source.Equal(source) && a.MinorBlockIndex == block {
+				return v.Message.Transaction, a, nil
+			}
+		}
+		if uint64(len(r.Records)) < page {
+			return nil, nil, fmt.Errorf("the Directory has executed no anchor of %s for block %d", partition, block)
+		}
+	}
+}
+
+// ExecutedBlock is the partition block that executed txid: the block of its main-chain entry receipt.
+func ExecutedBlock(ctx context.Context, q api.Querier2, txid *url.TxID) (uint64, error) {
+	h := txid.Hash()
+	e, err := q.QueryChainEntry(ctx, txid.Account(), &api.ChainQuery{Name: "main", Entry: h[:], IncludeReceipt: &api.ReceiptOptions{ForAny: true}})
+	if err != nil || e.Receipt == nil {
+		return 0, fmt.Errorf("the main-chain entry receipt of %v: %v", txid, err)
+	}
+	return e.Receipt.LocalBlock, nil
+}

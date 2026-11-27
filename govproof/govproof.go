@@ -90,7 +90,7 @@ type KeyPageResult struct {
 	Partition       string // the partition's system ledger URL
 	Height          uint64 // the partition block, read from the proven ledger (or, in the directory-root form, from the partition's anchor)
 	BlockTime       int64  // the partition block's time (Unix seconds), read from the proven ledger; 0 and named in Unproven when not proven
-	RootAnchor      []byte // the partition's root-chain anchor at that block, read from the proven ledger; nil in the directory-root form
+	RootAnchor      []byte // the partition's root-chain anchor at that block, read from the proven ledger (or, in the directory-root form, from the partition anchor)
 	DirectoryHeight int64
 	// HeightProvenBy names what proves Height in the directory-root form (HeightByPartitionAnchor); empty in the ledger form, where the proven
 	// ledger states it.
@@ -266,8 +266,13 @@ type GovernanceExecution struct {
 	Signatures []l0proof.Bytes `json:"signatures"`
 	// Receipt proves the transaction executed (its hash on the account's main chain) and reached a certified Directory root.
 	Receipt l0proof.L0ProofChain `json:"receipt"`
-	// Page is the governance key page at the block that executed the transaction.
+	// Page is the governance key page at the block that executed the transaction: the ledger form, or the directory-root form bound by the
+	// partition anchor of exactly that block (main's ruling on L3170).
 	Page KeyPageProof `json:"page"`
+	// ExecutedBlock is a LABEL: the partition block the capture recorded as the one that executed the transaction (the entry receipt's block).
+	// The directory-root form requires it and refuses an anchor of any other block; the ledger form refuses it when it differs from the proven
+	// ledger's block. Zero (omitted) is accepted only with the ledger form, whose proven ledger states the block.
+	ExecutedBlock uint64 `json:"executedBlock,omitempty"`
 }
 
 // GovernanceExpectation is what the RELYING PARTY expects; none of it is read from the proof.
@@ -325,16 +330,30 @@ func VerifyGovernance(g *GovernanceExecution, exp GovernanceExpectation, opts l0
 	if !kp.Verified {
 		return failGov("governance page: %s", kp.Reason)
 	}
-	if kp.Form != FormLedger {
-		// a page at a Directory-recorded root proves no root-chain anchor, so it cannot show the page at the executing block (main's ruling: G2
-		// only with the page proof at the executing block)
-		return failGov("the governance page is proven at a Directory-recorded root (block %d), not at the block that executed the transaction; G2 needs the page with its ledger at the executing block", kp.Height)
-	}
 	if !strings.EqualFold(kp.Page.URL, exp.Page) {
 		return failGov("the page proof is for %s, not the governance page %s", kp.Page.URL, exp.Page)
 	}
-	if !bytes.Equal(kp.RootAnchor, partitionRoot) {
-		return failGov("the page is proven at block %d, not at the block that executed the transaction (root anchor %X, want %X)", kp.Height, kp.RootAnchor, partitionRoot)
+	switch kp.Form {
+	case FormDirectoryRoot:
+		// the page at the executing block through its partition's anchor (main's ruling on L3170): (a) the anchor is proven on the Directory's anchor
+		// pool and names the page's partition (VerifyKeyPage above), (b) its block IS the block the capture recorded as executing the transaction,
+		// (c) the transaction's entry path reaches the anchor's RootChainAnchor, (d) the page is proven at the anchor's state root (VerifyKeyPage)
+		if g.ExecutedBlock == 0 {
+			return failGov("link (b): the execution records no executing block, so the partition anchor of block %d cannot be held to it", kp.Height)
+		}
+		if kp.Height != g.ExecutedBlock {
+			return failGov("link (b): the partition anchor states block %d, not the block %d that executed the transaction", kp.Height, g.ExecutedBlock)
+		}
+		if !bytes.Equal(kp.RootAnchor, partitionRoot) {
+			return failGov("link (c): the transaction's entry path reaches root anchor %X, not the partition anchor's root chain anchor %X", partitionRoot, kp.RootAnchor)
+		}
+	default:
+		if g.ExecutedBlock != 0 && g.ExecutedBlock != kp.Height {
+			return failGov("the execution records executing block %d, but the page's ledger is at block %d", g.ExecutedBlock, kp.Height)
+		}
+		if !bytes.Equal(kp.RootAnchor, partitionRoot) {
+			return failGov("the page is proven at block %d, not at the block that executed the transaction (root anchor %X, want %X)", kp.Height, kp.RootAnchor, partitionRoot)
+		}
 	}
 	if kp.Page.AcceptThreshold == 0 {
 		return failGov("the proven page has no accept threshold")

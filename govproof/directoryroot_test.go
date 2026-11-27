@@ -23,11 +23,14 @@ import (
 // dirRootFixture is the SIMULATOR fixture of a page proven at a Directory-recorded root (testdata/simulator/directory-root.json, written by
 // l0proofref TestSimulatorDirectoryRootFixture): verified only against its own pin passed explicitly, never a Kermit claim.
 type dirRootFixture struct {
-	Proof          govproof.KeyPageProof    `json:"proof"`
-	Pin            consensus.Pin            `json:"pin"`
-	SignerKeyHash  l0proof.Bytes            `json:"signerKeyHash"`
-	OtherPartition string                   `json:"otherPartition"`
-	OtherAnchor    govproof.PartitionAnchor `json:"otherAnchor"`
+	Proof          govproof.KeyPageProof          `json:"proof"`
+	Pin            consensus.Pin                  `json:"pin"`
+	SignerKeyHash  l0proof.Bytes                  `json:"signerKeyHash"`
+	OtherPartition string                         `json:"otherPartition"`
+	OtherAnchor    govproof.PartitionAnchor       `json:"otherAnchor"`
+	Governance     govproof.GovernanceExecution   `json:"governance"`
+	GovExpect      govproof.GovernanceExpectation `json:"govExpect"`
+	LaterPage      govproof.KeyPageProof          `json:"laterPage"`
 }
 
 func loadDirRoot(t testing.TB) *dirRootFixture {
@@ -84,8 +87,8 @@ func TestS28clAPageAtADirectoryRecordedRootCreditsItsKeysAndTheAnchoredHeight(t 
 	if want := "acc://bvn-" + strings.ToLower(f.Proof.Partition) + ".acme/ledger"; r.Partition != want {
 		t.Fatalf("partition %q, want %q", r.Partition, want)
 	}
-	if r.BlockTime != 0 || r.RootAnchor != nil || !reflect.DeepEqual(r.Unproven, []string{govproof.UnprovenBlockTime}) {
-		t.Fatalf("the verdict claims a block time %d or root anchor %X the anchor does not prove (unproven %v)", r.BlockTime, r.RootAnchor, r.Unproven)
+	if r.BlockTime != 0 || len(r.RootAnchor) != 32 || !reflect.DeepEqual(r.Unproven, []string{govproof.UnprovenBlockTime}) {
+		t.Fatalf("the verdict claims a block time %d the anchor does not prove, or not the root anchor %X it states (unproven %v)", r.BlockTime, r.RootAnchor, r.Unproven)
 	}
 }
 
@@ -110,15 +113,56 @@ func TestS28clADirectoryRootProofWithoutTheAnchorTransactionCreditsNoHeight(t *t
 	mustRefuseKP(t, govproof.VerifyKeyPage(p, l0proof.Options{OverridePin: &f.Pin}), "neither its partition nor its block height is proven")
 }
 
-// G2 needs the page at the executing block: a governance execution whose page is a directory-root proof is refused, even when everything else holds.
-func TestS28clADirectoryRootPageNeverStandsInForTheExecutingBlock(t *testing.T) {
-	g := load(t)
-	ex := cloneExec(t, &g.Execution)
-	d := loadDirRoot(t)
-	ex.Page = *cloneKP(t, &d.Proof)
-	r := govproof.VerifyGovernance(ex, g.Expect, l0proof.Options{OverridePin: &d.Pin})
-	if r.Verified || !strings.Contains(r.Reason, "not at the block that executed the transaction") {
-		t.Fatalf("verified %v (%s); want the directory-root page refused for G2", r.Verified, r.Reason)
+// L3170 (main's ruling): a governance execution whose page is proven in the directory-root form verifies at G2 exactly when every link holds:
+// (a) the partition anchor is proven and names the page's partition, (b) its block IS the block the capture recorded as executing the
+// transaction, (c) the transaction's entry path reaches the anchor's root chain anchor, (d) the page is proven at the anchor's state root, its
+// threshold and keys checked against the signatures.
+func TestS28clAGovernancePageAtItsAnchoredExecutingBlockVerifiesG2(t *testing.T) {
+	f := loadDirRoot(t)
+	opts := l0proof.Options{OverridePin: &f.Pin}
+	r := govproof.VerifyGovernance(&f.Governance, f.GovExpect, opts)
+	if !r.Verified || r.Height != f.Governance.ExecutedBlock || r.Signers != 1 || r.Threshold != 1 {
+		t.Fatalf("the directory-root governance execution: %+v", r)
+	}
+}
+
+func cloneGov(t *testing.T, g *govproof.GovernanceExecution) *govproof.GovernanceExecution {
+	b, err := json.Marshal(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c govproof.GovernanceExecution
+	if err := json.Unmarshal(b, &c); err != nil {
+		t.Fatal(err)
+	}
+	return &c
+}
+
+// Bites of each link (main's ruling on L3170): a wrong block, another partition, a receipt to a different root, a page proven at another root,
+// and no recorded executing block each refuse, naming the link.
+func TestS28clEachMissingLinkOfTheAnchoredG2Refuses(t *testing.T) {
+	f := loadDirRoot(t)
+	opts := l0proof.Options{OverridePin: &f.Pin}
+	cases := map[string]struct {
+		mutate func(g *govproof.GovernanceExecution)
+		want   string
+	}{
+		"wrong block":     {func(g *govproof.GovernanceExecution) { g.ExecutedBlock++ }, "link (b)"},
+		"no block":        {func(g *govproof.GovernanceExecution) { g.ExecutedBlock = 0 }, "link (b): the execution records no executing block"},
+		"other partition": {func(g *govproof.GovernanceExecution) { pa := f.OtherAnchor; g.Page.PartitionAnchor = &pa }, "the anchor names partition"},
+		"receipt to a different root": {func(g *govproof.GovernanceExecution) {
+			g.Page = *cloneKP(t, &f.LaterPage)
+			g.ExecutedBlock = f.LaterPage.Height
+		}, "link (c)"},
+		"page at another root": {func(g *govproof.GovernanceExecution) { g.Page.PageState = f.LaterPage.PageState }, "but the partition's anchor states root"},
+	}
+	for name, c := range cases {
+		g := cloneGov(t, &f.Governance)
+		c.mutate(g)
+		r := govproof.VerifyGovernance(g, f.GovExpect, opts)
+		if r.Verified || !strings.Contains(r.Reason, c.want) {
+			t.Errorf("%s: verified %v (%s); want a refusal naming %q", name, r.Verified, r.Reason, c.want)
+		}
 	}
 }
 

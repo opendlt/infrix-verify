@@ -37,8 +37,9 @@ import (
 // The anchor transaction binds the PARTITION (an anchor-chain entry alone proves only that V is an element of some Directory chain, since an account
 // hash covers chain anchors, not chain names) and proves the block index. The verifier credits the page's keys at that Directory-certified root of
 // the partition, and the block height exactly as the anchor states it: the minor block whose BPT root the partition anchored as V. The block's time is
-// not in the anchor, so it is named UNPROVEN and never claimed. The page's root-chain anchor is not credited either, so this form never stands in for a
-// page at a governance transaction's executing block (G2 needs the ledger-carrying form there).
+// not in the anchor, so it is named UNPROVEN and never claimed. The anchor also states the partition's root-chain anchor at that block
+// (RootChainAnchor), which the verdict carries: a governance execution holds its transaction's entry path to it and its executing block to the
+// anchor's block, so this form proves the page AT the executing block (G2, main's ruling on L3170) exactly when every link holds.
 
 // Forms of a KeyPageProof (KeyPageResult.Form).
 const (
@@ -160,7 +161,7 @@ func decodeBlockValidatorAnchor(body []byte) (*blockAnchor, error) {
 			return nil, fmt.Errorf("the partition anchor has unknown field %d", f)
 		}
 	}
-	if a.Source == "" || a.MinorBlockIndex == 0 || a.StateTreeAnchor == nil {
+	if a.Source == "" || a.MinorBlockIndex == 0 || a.StateTreeAnchor == nil || a.RootChainAnchor == nil {
 		return nil, errors.New("the partition anchor names no source, minor block or state tree anchor")
 	}
 	return a, nil
@@ -254,6 +255,7 @@ func verifyAtDirectoryRoot(p *KeyPageProof, res KeyPageResult, pin *consensus.Pi
 	res.Partition = strings.ToLower(a.Source) + "/ledger"
 	res.Height, res.HeightProvenBy = a.MinorBlockIndex, HeightByPartitionAnchor
 	res.Unproven = []string{UnprovenBlockTime}
+	res.RootAnchor = append([]byte(nil), a.RootChainAnchor...)
 	res.DirectoryHeight = last.Header.Height
 	return res
 }

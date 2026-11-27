@@ -368,6 +368,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 		report.add("bundle_parse", CheckPass, "bundle "+bundle.ID)
 	}
 
+	report.checkBundleHash(&bundle, bundleParsed)
 	report.checkPlanHashBinding(pkg, &bundle, bundleParsed)
 	report.checkOutcomeDigestBinding(pkg, &bundle, bundleParsed)
 	report.checkEvidenceChain(pkg)
@@ -502,7 +503,7 @@ func (r *Report) applyReplayChecks(requireReplay bool) {
 }
 
 // integrityChecks are the bindings every level presupposes.
-var integrityChecks = []string{"cryptographic_offline", "bundle_parse", "plan_hash_binding", "outcome_digest_binding", "evidence_chain"}
+var integrityChecks = []string{"cryptographic_offline", "bundle_parse", "bundle_hash", "plan_hash_binding", "outcome_digest_binding", "evidence_chain"}
 
 // integrityHolds reports whether every integrity check ran and passed.
 func (r *Report) integrityHolds() bool {
@@ -593,6 +594,27 @@ func (r *Report) checkPlanHashBinding(pkg *evidence.PortableEvidencePackage, bun
 		return
 	}
 	r.add("plan_hash_binding", CheckFail, "PlanHash has no binding witness in the bundle")
+}
+
+// checkBundleHash recomputes the bundle's hash over its sealed content and holds the stored BundleHash to it (brief 28cd, L3124). The hash covers
+// the outcome digest, the anchor candidate digest, the plan content hash, the sealed block height and every step's per-category gas, so a bundle
+// whose outcome digest was swapped after it was sealed fails here; one whose stored BundleHash was rewritten to match fails anchor_proof, where
+// the anchored batch root still holds the sealed hash.
+func (r *Report) checkBundleHash(bundle *evidence.EvidenceBundle, ok bool) {
+	if !ok {
+		r.add("bundle_hash", CheckFail, "bundle did not parse")
+		return
+	}
+	got, err := bundle.ComputeBundleHash()
+	if err != nil {
+		r.add("bundle_hash", CheckFail, "recompute bundle hash: "+err.Error())
+		return
+	}
+	if got != bundle.BundleHash {
+		r.add("bundle_hash", CheckFail, fmt.Sprintf("the bundle's content hashes to %x…, not its sealed BundleHash %x… (the bundle was changed after it was sealed)", got[:8], bundle.BundleHash[:8]))
+		return
+	}
+	r.add("bundle_hash", CheckPass, "the sealed content (outcome digest, anchor candidate, plan content hash, sealed height, step gas) recomputes to BundleHash")
 }
 
 func (r *Report) checkOutcomeDigestBinding(pkg *evidence.PortableEvidencePackage, bundle *evidence.EvidenceBundle, ok bool) {

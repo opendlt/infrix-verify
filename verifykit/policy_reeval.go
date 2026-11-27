@@ -34,7 +34,7 @@ type PolicyReevaluation struct {
 // canonical policy document, when a re-evaluation denies (NL-03: a recorded allow the policy does not reproduce), or when a policy is not
 // the one the relying party pinned for its type. It is a SKIP that credits no G0, and fails nothing, when there is nothing to re-run, when
 // a recorded decision has no re-evaluable policy beside it (in order and by type), when a pinned type is missing, or when a policy reads an
-// operand the subject does not carry (the node's state is not provable offline).
+// operand the subject does not carry and no proof covers (actor::role is proven by the bundle's RoleRegistryProof, L3112).
 //
 // When approvals signed the plan (any approval carries a plan hash), every re-evaluated subject must be bound into the plan hash they signed
 // (brief 28bu row 2, the L3008 (b) ruling): planHash must equal evidence.BindPlanHash(bundle.PlanContentHash, the evaluations). A bundle
@@ -53,6 +53,18 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 	}
 	results := make([]PolicyReevaluation, 0, len(evals))
 	defer func() { r.PolicyReevaluations = results }()
+
+	// actor::role operands are answered only from the role registry proven against the bundle's StateRoot (infrix-core L3112): a proof that
+	// does not recompute FAILS; an actor it does not cover leaves actor::role unproven, exactly as the subject-only context refuses it
+	var provenRoles map[string][]string
+	if bundle.RoleRegistryProof != nil {
+		var err error
+		if provenRoles, err = VerifyRoleRegistryProof(bundle.StateRoot, bundle.RoleRegistryProof); err != nil {
+			r.add(name, CheckFail, fmt.Sprintf("the role registry proof does not verify against the bundle's state root: %v", err))
+			return false
+		}
+	}
+	provedActors := 0
 
 	var undecided string
 	for i, ev := range evals {
@@ -79,7 +91,11 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 			}
 			res.Pinned = ok
 		}
-		out, err := doc.Decide(&policyeval.SubjectOnlyContext{Subject: subjectOf(ev.Subject)})
+		roles, proven := provenRoles[evidence.CanonicalRoleHolder(ev.Subject.Actor)]
+		if proven {
+			provedActors++
+		}
+		out, err := doc.Decide(&policyeval.ProvenRolesContext{Subject: subjectOf(ev.Subject), ActorRoles: roles, ActorProven: proven})
 		if err != nil {
 			if undecided == "" {
 				undecided = fmt.Sprintf("policy %d (%s) cannot be re-evaluated offline: %v", i, ev.PolicyType, err)
@@ -143,6 +159,9 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 		bound = "; every subject is bound into the plan hash the approvals signed"
 	}
 	detail := fmt.Sprintf("%d content-addressed policies re-evaluated with the node's evaluator body; every one allows%s", len(evals), bound)
+	if provedActors > 0 {
+		detail += fmt.Sprintf("; actor::role answered for %d evaluation(s) from the role registry proven against the bundle's state root", provedActors)
+	}
 	if pins == nil {
 		detail += " (no policy registry pinned: the hashes are reported for the relying party to compare)"
 	}

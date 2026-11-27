@@ -9,7 +9,7 @@ module github.com/opendlt/infrix-verify
 
 go 1.25.7
 
-require github.com/opendlt/infrix-schema v0.7.2-0.20261127042914-3608e9634e27
+require github.com/opendlt/infrix-schema v0.7.2-0.20261127093000-09ae0c1ea882
 
 require golang.org/x/sys v0.42.0 // indirect
 

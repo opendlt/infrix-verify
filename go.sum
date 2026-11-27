@@ -23,6 +23,8 @@ github.com/opendlt/infrix-schema v0.7.2-0.20261127021034-e5e49a20366f h1:bsR0YNV
 github.com/opendlt/infrix-schema v0.7.2-0.20261127021034-e5e49a20366f/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=
 github.com/opendlt/infrix-schema v0.7.2-0.20261127042914-3608e9634e27 h1:gNPS89eI4v+3Z/4vTiEqNlE++DAbrw4XSXNZXec39MM=
 github.com/opendlt/infrix-schema v0.7.2-0.20261127042914-3608e9634e27/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=
+github.com/opendlt/infrix-schema v0.7.2-0.20261127093000-09ae0c1ea882 h1:3gB3huax7cDAzKlxjEM/XwjSmu8na1ZrKp3iQqIfSgU=
+github.com/opendlt/infrix-schema v0.7.2-0.20261127093000-09ae0c1ea882/go.mod h1:OoF2gfDsX6psP8o08fcp0xAIUA8UrwvbXcokKlY5hVg=
 github.com/piprate/json-gold v0.9.1 h1:6CHfM9gxglyRv2MdxxRLzLJQVRPWraVx4i+i5RluYfU=
 github.com/piprate/json-gold v0.9.1/go.mod h1:gcirrR3WDKegzR9SNouIB0uFhVqY2FXb2b46f4FN6Ec=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

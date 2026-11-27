@@ -68,10 +68,16 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 			return false
 		}
 	}
-	// actor::has_key is answered through the node's own body (policyeval.ResolveActorHasKey) from the key pages the bundle proves under the pin
-	// (infrix-core L3196): a page proof that does not verify FAILS; a page it does not prove leaves actor::has_key unproven (an account's absence
-	// is not provable from Accumulate's receipts)
+	// actor::has_key is answered through the node's own body (policyeval.ResolveActorHasKey) from the key pages and key books the bundle proves
+	// under the pin (infrix-core L3196): a proven page answers from its proven entries (true or false), a page past a proven book's page count is
+	// a proven false, a proof that does not verify FAILS, and any other page leaves actor::has_key unproven (an absent identity or key book is not
+	// provable from Accumulate's receipts, policyeval.ErrAbsenceNotProvable)
 	provenPages, err := verifiedKeyPages(bundle, opts)
+	if err != nil {
+		r.add(name, CheckFail, err.Error())
+		return false
+	}
+	provenBooks, err := verifiedKeyBooks(bundle, opts)
 	if err != nil {
 		r.add(name, CheckFail, err.Error())
 		return false
@@ -107,7 +113,7 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 		if proven {
 			provedActors++
 		}
-		out, err := doc.Decide(&policyeval.ProvenRolesContext{Subject: subjectOf(ev.Subject), ActorRoles: roles, ActorProven: proven, ProvenPages: provenPages})
+		out, err := doc.Decide(&policyeval.ProvenRolesContext{Subject: subjectOf(ev.Subject), ActorRoles: roles, ActorProven: proven, ProvenPages: provenPages, ProvenBooks: provenBooks})
 		if err != nil {
 			if undecided == "" {
 				undecided = fmt.Sprintf("policy %d (%s) cannot be re-evaluated offline: %v", i, ev.PolicyType, err)
@@ -185,11 +191,11 @@ func subjectOf(s evidence.PolicySubject) policyeval.Subject {
 	return policyeval.Subject{Actor: s.Actor, Contract: s.Contract, Function: s.Function, BlockHeight: s.BlockHeight, Amount: s.Amount}
 }
 
-// verifiedKeyPages is the set of key pages (URL, lower case) the bundle proves under the verifier's pin, from its approval pages (KeyPageProofs)
-// and the pages its policies read (OperandPageProofs): every proof is verified (govproof.VerifyKeyPage), a proof that does not verify is an
-// error, and a proof captured under a pin this verifier does not hold proves nothing.
-func verifiedKeyPages(bundle *evidence.EvidenceBundle, opts Options) (map[string]bool, error) {
-	pages := map[string]bool{}
+// verifiedKeyPages is the key pages (URL, lower case) the bundle proves under the verifier's pin, each with its proven entries, from its approval
+// pages (KeyPageProofs) and the pages its policies read (OperandPageProofs): every proof is verified (govproof.VerifyKeyPage), a proof that does
+// not verify is an error, and a proof captured under a pin this verifier does not hold proves nothing.
+func verifiedKeyPages(bundle *evidence.EvidenceBundle, opts Options) (map[string]policyeval.KeyPageEntries, error) {
+	pages := map[string]policyeval.KeyPageEntries{}
 	all := append(append([]json.RawMessage(nil), bundle.KeyPageProofs...), bundle.OperandPageProofs...)
 	for i, raw := range all {
 		var p govproof.KeyPageProof
@@ -203,7 +209,29 @@ func verifiedKeyPages(bundle *evidence.EvidenceBundle, opts Options) (map[string
 		if !res.Verified {
 			return nil, fmt.Errorf("key-page proof %d: %s", i, res.Reason)
 		}
-		pages[strings.ToLower(res.Page.URL)] = true
+		pages[strings.ToLower(res.Page.URL)] = policyeval.KeyPageEntries{KeyHashes: res.Page.KeyHashes, Delegates: res.Page.Delegates}
 	}
 	return pages, nil
+}
+
+// verifiedKeyBooks is the key books (URL, lower case) the bundle proves under the verifier's pin (OperandBookProofs), each with its proven page
+// count: every proof is verified (govproof.VerifyKeyBook), a proof that does not verify is an error, and a proof captured under a pin this
+// verifier does not hold proves nothing.
+func verifiedKeyBooks(bundle *evidence.EvidenceBundle, opts Options) (map[string]uint64, error) {
+	books := map[string]uint64{}
+	for i, raw := range bundle.OperandBookProofs {
+		var p govproof.KeyBookProof
+		if err := decodeStrict(raw, &p); err != nil {
+			return nil, fmt.Errorf("key-book proof %d: %v", i, err)
+		}
+		if _, unheld := unheldPin(p.Incarnation, opts); unheld {
+			continue
+		}
+		res := govproof.VerifyKeyBook(&p, l0Opts(opts))
+		if !res.Verified {
+			return nil, fmt.Errorf("key-book proof %d: %s", i, res.Reason)
+		}
+		books[strings.ToLower(res.Book.URL)] = res.Book.PageCount
+	}
+	return books, nil
 }

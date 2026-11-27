@@ -65,7 +65,20 @@ type KeyPage struct {
 	AcceptThreshold uint64
 	Version         uint64
 	KeyHashes       [][]byte
+	// Delegates are the key books the page's entries delegate to (an entry's Delegate), lower case as proven: actor::has_key reads them
+	// (infrix-core L3196). A delegate is never a key of the page: KeyHashes and Has count keys only.
+	Delegates []string
 }
+
+// KeyBook is what a verified key-book proof establishes: the book's page count, so every page index past it is proven absent (infrix-core L3196).
+type KeyBook struct {
+	URL       string
+	PageCount uint64
+}
+
+// KeyBookProof proves a key book's state at a Directory-certified block under the pin: the same layout as a KeyPageProof (both forms), with Page
+// labelling the key book's URL and PageState carrying the book's state.
+type KeyBookProof = KeyPageProof
 
 // Has reports whether the page lists the key hash.
 func (p *KeyPage) Has(keyHash []byte) bool {
@@ -86,10 +99,11 @@ type KeyPageResult struct {
 	// Form is FormLedger or FormDirectoryRoot.
 	Form            string
 	Page            KeyPage
-	Partition       string // the partition's system ledger URL
-	Height          uint64 // the partition block, read from the proven ledger (or, in the directory-root form, from the partition's anchor)
-	BlockTime       int64  // the partition block's time (Unix seconds), read from the proven ledger; 0 and named in Unproven when not proven
-	RootAnchor      []byte // the partition's root-chain anchor at that block, read from the proven ledger (or, in the directory-root form, from the partition anchor)
+	Book            KeyBook // set by VerifyKeyBook (a key-book proof); a key-page proof leaves it empty
+	Partition       string  // the partition's system ledger URL
+	Height          uint64  // the partition block, read from the proven ledger (or, in the directory-root form, from the partition's anchor)
+	BlockTime       int64   // the partition block's time (Unix seconds), read from the proven ledger; 0 and named in Unproven when not proven
+	RootAnchor      []byte  // the partition's root-chain anchor at that block, read from the proven ledger (or, in the directory-root form, from the partition anchor)
 	DirectoryHeight int64
 	// HeightProvenBy names what proves Height in the directory-root form (HeightByPartitionAnchor); empty in the ledger form, where the proven
 	// ledger states it.
@@ -125,6 +139,51 @@ func limits(opts l0proof.Options) *l0proof.Limits {
 
 // VerifyKeyPage checks every link of a key-page proof against the verifier's pin. It never panics and never credits a partial proof.
 func VerifyKeyPage(p *KeyPageProof, opts l0proof.Options) KeyPageResult {
+	var kp KeyPage
+	res := verifyAccountProof(p, opts, "key page", func(main []byte) (string, error) {
+		page, err := l0proof.DecodeKeyPage(main)
+		if err != nil {
+			return "", err
+		}
+		kp = KeyPage{URL: page.URL, AcceptThreshold: page.AcceptThreshold, Version: page.Version}
+		for _, k := range page.Keys {
+			// a delegate-only entry is not a key of this page and is never counted as one
+			if len(k.PublicKeyHash) > 0 {
+				kp.KeyHashes = append(kp.KeyHashes, k.PublicKeyHash)
+			}
+			if k.Delegate != "" {
+				kp.Delegates = append(kp.Delegates, k.Delegate)
+			}
+		}
+		return page.URL, nil
+	})
+	if res.Verified {
+		res.Page = kp
+	}
+	return res
+}
+
+// VerifyKeyBook checks every link of a key-book proof against the verifier's pin, exactly as VerifyKeyPage checks a page, and establishes the
+// book's page count (infrix-core L3196: a page index past it is proven absent). It never panics and never credits a partial proof.
+func VerifyKeyBook(p *KeyBookProof, opts l0proof.Options) KeyPageResult {
+	var kb KeyBook
+	res := verifyAccountProof(p, opts, "key book", func(main []byte) (string, error) {
+		book, err := l0proof.DecodeKeyBook(main)
+		if err != nil {
+			return "", err
+		}
+		kb = KeyBook{URL: book.URL, PageCount: book.PageCount}
+		return book.URL, nil
+	})
+	if res.Verified {
+		res.Book = kb
+	}
+	return res
+}
+
+// verifyAccountProof checks every link of a key-page or key-book proof against the verifier's pin; decode reads the account's main state and
+// answers its URL, which must be the label. The caller records what the account establishes when the result is verified.
+func verifyAccountProof(p *KeyPageProof, opts l0proof.Options, kind string, decode func(main []byte) (string, error)) KeyPageResult {
 	var res KeyPageResult
 	pin, overridden, err := selectPin(opts)
 	if err != nil {
@@ -132,7 +191,7 @@ func VerifyKeyPage(p *KeyPageProof, opts l0proof.Options) KeyPageResult {
 	}
 	res.Pin, res.PinOverridden = pin.ID(), overridden
 	if p == nil {
-		return failKP(res, "no key-page proof")
+		return failKP(res, "no %s proof", kind)
 	}
 	if p.Incarnation != res.Pin {
 		return failKP(res, "the key-page proof was captured under incarnation %q, not the verifier's pin %q (%s)", p.Incarnation, res.Pin, pin.Network)
@@ -144,19 +203,12 @@ func VerifyKeyPage(p *KeyPageProof, opts l0proof.Options) KeyPageResult {
 	if err != nil {
 		return failKP(res, "page state: %v", err)
 	}
-	page, err := l0proof.DecodeKeyPage(p.PageState.MainState)
+	accountURL, err := decode(p.PageState.MainState)
 	if err != nil {
 		return failKP(res, "page state: %v", err)
 	}
-	var keyHashes [][]byte
-	for _, k := range page.Keys {
-		// a delegate-only entry is not a key of this page and is never counted
-		if len(k.PublicKeyHash) > 0 {
-			keyHashes = append(keyHashes, k.PublicKeyHash)
-		}
-	}
-	if !strings.EqualFold(page.URL, ps.URL) || !strings.EqualFold(page.URL, p.Page) {
-		return failKP(res, "the proof proves key page %s, not %s", page.URL, p.Page)
+	if !strings.EqualFold(accountURL, ps.URL) || !strings.EqualFold(accountURL, p.Page) {
+		return failKP(res, "the proof proves %s %s, not %s", kind, accountURL, p.Page)
 	}
 	// the page hands nothing up the proof, so its chain index is fixed; the ledger hands up its root chain, which is the fourth of a system ledger's
 	// chains in the order hashChains hashes them (the chain set sorted by name; measured on the simulator's BVN ledger and Kermit's Directory ledger)
@@ -164,7 +216,7 @@ func VerifyKeyPage(p *KeyPageProof, opts l0proof.Options) KeyPageResult {
 		return failKP(res, "the page proof names chain %d; it hands no chain up and must name 0", p.PageState.Chain)
 	}
 	if p.PartitionAnchor != nil || emptyAccountProof(&p.LedgerState) {
-		return verifyAtDirectoryRoot(p, res, pin, lim, ps, page, keyHashes)
+		return verifyAtDirectoryRoot(p, res, pin, lim, ps)
 	}
 	if p.Partition != "" {
 		return failKP(res, "the ledger form names no partition label (the proven ledger names the partition); this proof names %q", p.Partition)
@@ -204,7 +256,6 @@ func VerifyKeyPage(p *KeyPageProof, opts l0proof.Options) KeyPageResult {
 	}
 	res.Verified = true
 	res.Form = FormLedger
-	res.Page = KeyPage{URL: page.URL, AcceptThreshold: page.AcceptThreshold, Version: page.Version, KeyHashes: keyHashes}
 	res.Partition, res.Height, res.BlockTime = ledger.URL, ledger.Index, ledger.Time
 	res.RootAnchor = append([]byte(nil), p.LedgerState.Chains[p.LedgerState.Chain]...)
 	res.DirectoryHeight = last.Header.Height

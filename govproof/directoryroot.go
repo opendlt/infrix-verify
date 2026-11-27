@@ -195,9 +195,9 @@ func emptyAccountProof(a *l0proof.AccountProof) bool {
 	return len(a.MainState) == 0 && len(a.SecondaryState) == 0 && len(a.Chains) == 0 && a.Chain == 0 && len(a.Pending) == 0 && len(a.StatePath) == 0
 }
 
-// verifyAtDirectoryRoot checks a directory-root key-page proof. The page has already been decoded and its proven URL matched to the label (ps, page,
-// keyHashes); res carries the pin.
-func verifyAtDirectoryRoot(p *KeyPageProof, res KeyPageResult, pin *consensus.Pin, lim *l0proof.Limits, ps *l0proof.AccountState, page *l0proof.KeyPage, keyHashes [][]byte) KeyPageResult {
+// verifyAtDirectoryRoot checks a directory-root key-page or key-book proof. The account has already been decoded and its proven URL matched to the
+// label (ps); res carries the pin.
+func verifyAtDirectoryRoot(p *KeyPageProof, res KeyPageResult, pin *consensus.Pin, lim *l0proof.Limits, ps *l0proof.AccountState) KeyPageResult {
 	if !emptyAccountProof(&p.LedgerState) {
 		return failKP(res, "the proof carries both a partition ledger and a partition anchor; a key-page proof takes one form")
 	}
@@ -251,7 +251,6 @@ func verifyAtDirectoryRoot(p *KeyPageProof, res KeyPageResult, pin *consensus.Pi
 	}
 	res.Verified = true
 	res.Form = FormDirectoryRoot
-	res.Page = KeyPage{URL: page.URL, AcceptThreshold: page.AcceptThreshold, Version: page.Version, KeyHashes: keyHashes}
 	res.Partition = strings.ToLower(a.Source) + "/ledger"
 	res.Height, res.HeightProvenBy = a.MinorBlockIndex, HeightByPartitionAnchor
 	res.Unproven = []string{UnprovenBlockTime}

@@ -1,0 +1,197 @@
+{
+  "proof": {
+    "incarnation": "pin:9c2d56f1591f4d40e5d30898b522ba6d447d5f3be9a49ebcecded98b4592ec6a",
+    "page": "acc://s28cz-operand.acme/book",
+    "height": 2,
+    "partition": "BVN0",
+    "pageState": {
+      "mainState": "010a021d6163633a2f2f733238637a2d6f706572616e642e61636d652f626f6f6b0421011f011d6163633a2f2f733238637a2d6f706572616e642e61636d652f626f6f6b0501",
+      "secondaryState": "22d1122d895eabec8ae71b62f12ffe7a8d1a228c9fb5143c10dc0fc8bcca283b",
+      "chains": null,
+      "chain": 0,
+      "pending": "0000000000000000000000000000000000000000000000000000000000000000",
+      "statePath": [
+        {
+          "right": true,
+          "hash": "48e7a9f2f62b24cfc23eb86cfcb36b4309d5764184f6d1ae21ae1f34c8a85f36"
+        },
+        {
+          "right": true,
+          "hash": "72de238d439d465bbb46660bc22f8b33152c217c71d7e23c2f8fbb729f9298d6"
+        },
+        {
+          "right": true,
+          "hash": "db88f5fe4f13d3a3681c275a4f5c5296e05dd41c0da4b91908bcd811b733416f"
+        },
+        {
+          "hash": "2bf85dbaba3cb14ee47038e23a01ab30325e77e4577174e44f217241019fdbc2"
+        }
+      ]
+    },
+    "partitionAnchor": {
+      "transaction": {
+        "header": "01156163633a2f2f646e2e61636d652f616e63686f7273",
+        "body": "0162025b01136163633a2f2f62766e2d42564e302e61636d650302040d0516ad362279cc01bd4b60af99b643895dee652c06799132f9cf73bcaed8042d4b069b17a0a00d7f1dbbb5569523449613fffe1b18bfbc6cb62906bd75d4896692d0"
+      },
+      "entryPath": [
+        {
+          "hash": "83f75c7b166d002c46fd6f55d253f5631fc1138650c7f97aa0a1b19c98090dfa"
+        },
+        {
+          "hash": "8659aed70125c55b3f4d977bc495474530f4eb2560a07e7ddf69fcb2ef1afec9"
+        },
+        {
+          "right": true,
+          "hash": "700a1fef0db40e3de3d134ae04ab75272537f783a6f9bc98adb3824eefde21bb"
+        },
+        {
+          "hash": "95d374a8dec35a1efca47d68400cc700eef1d65183dbdce3b83fb46753a6ac3b"
+        },
+        {
+          "hash": "676b554a398475a00f6840c4b15df7008bfeabd9bf8e8a3c1672743e98af65df"
+        },
+        {
+          "hash": "edbb726729604206f57b72e3a4475a58c4f103dc3c6d013c363c70c28e1d74c4"
+        }
+      ]
+    },
+    "directory": {
+      "anchorPath": [
+        {
+          "hash": "76234aa61aa38ffc00a900bb637b376faffebcebec98e6604d43c01a8c8999f6"
+        },
+        {
+          "hash": "a684e8f8297e99a0125d2ee19f7c741efad7df17f2cd4718e7156141882988b3"
+        },
+        {
+          "right": true,
+          "hash": "76b021479e779d036b54be115b9d6388487eb6e222b55696b8801f357044793f"
+        },
+        {
+          "right": true,
+          "hash": "0860988bac9a71c3be6486ef722b0e68eb4035f29ad0e4611c250728d187794e"
+        },
+        {
+          "hash": "8162267c3cc83cae568c9e574d3fc1660044598c1fc4e45e572052e512ddfd2d"
+        },
+        {
+          "hash": "8bb409e47dcc5768e76d97d486b1ccc2c8e2d88e45f9d7109bd402ac5802435d"
+        }
+      ],
+      "ledger": {
+        "mainState": "010e02146163633a2f2f646e2e61636d652f6c65646765720308048ee4f1ab0c08090908010442564e300209",
+        "secondaryState": "0000000000000000000000000000000000000000000000000000000000000000",
+        "chains": [
+          "bbb47a0c486e95c79a1280995674e3d477e4a3c9b8511809e873d2b72f7be732",
+          "85f7a6db3b082171ef602e390d4b4155acd2754ff50422a19c3875bc6e98c1c9",
+          "e43be90e349210456662d8b8bdc9cc9e5e46ccb07f2129e7b57a8195e5e916d5",
+          "f5b572f273230c78e22fda56b203beb357e8918f3b7c64ed5dfc71542b331b43",
+          "8deb2841536d21ab6f7028e119e4ca06d281e824491cf8898e065bece319c0d0"
+        ],
+        "chain": 3,
+        "pending": "0000000000000000000000000000000000000000000000000000000000000000",
+        "statePath": [
+          {
+            "hash": "341ff6e0cfedb4fff405d6cd34d3d2902b68f5697ce26d0ed5229f5397dbbd37"
+          },
+          {
+            "hash": "ab4852dc7ba0e94a91a51a12366a240e011ea7eb449e652146410c9c8e7495d8"
+          },
+          {
+            "right": true,
+            "hash": "7b882ecda267eab5cb508d6995fabfe14851dbf3faaca1fe7f02c1db08d0a369"
+          }
+        ]
+      }
+    },
+    "consensus": [
+      {
+        "header": {
+          "version": {
+            "block": 11,
+            "app": 0
+          },
+          "chainId": "embedded.Directory",
+          "height": 9,
+          "time": {
+            "seconds": 1795822984,
+            "nanos": 90146900
+          },
+          "lastBlockId": {
+            "hash": "b4026b240b620555365b700c507502a18bbfafdac0b9f391dff667ac61a0e950",
+            "partSetHeader": {
+              "total": 1,
+              "hash": "ecb1c87540583f6c532e0e8f12c4c6cdd70e8a6d4f3fb8e1ba236c8fe83cae6a"
+            }
+          },
+          "lastCommitHash": "6c701114210d7155d1fb1607f65b677a6b21df894ca59d0ce7e15ae8f953312e",
+          "dataHash": "010588721695eccbb68c50f352dc4ccfba9361d7e4b10572c448c8e94dc6c4d6",
+          "validatorsHash": "208f201e25211db383daf29cbb13b46f6b9195a9bff98796aa67d6c418c58c21",
+          "nextValidatorsHash": "208f201e25211db383daf29cbb13b46f6b9195a9bff98796aa67d6c418c58c21",
+          "consensusHash": "c76a0c769fffe5e293c1f0497aac7d4bd887ba869969c8189be884ebada48419",
+          "appHash": "ae73aa4b8f4d3eb4e6a7c5d2928ce1bbf5ec8569350990fbf7e8f729cdd263f6",
+          "lastResultsHash": "6fbc5a3cec22267ba072e29c0df0a9980ad7d231a8bc0996801278955efd2469",
+          "evidenceHash": "6724a9419c7aaa98fc14658585c0c07128af23d85f048a61ce669545a07b8743",
+          "proposerAddress": "0953c93d0f3920e25fbab5fa6bbbd77c2d83d58c"
+        },
+        "commit": {
+          "height": 9,
+          "round": 0,
+          "blockId": {
+            "hash": "7d1be9e7efbe9c05a53cd532db52be47fc497f8463f26ae649710880cf2593ca",
+            "partSetHeader": {
+              "total": 1,
+              "hash": "1757f57ce84a18c7c793de37023116e474598b6500888ce3a8ab5f6bbb3d0000"
+            }
+          },
+          "signatures": [
+            {
+              "blockIdFlag": 2,
+              "validatorAddress": "0953c93d0f3920e25fbab5fa6bbbd77c2d83d58c",
+              "timestamp": {
+                "seconds": 1795822984,
+                "nanos": 91146900
+              },
+              "signature": "d725ee23bb6391ed2061178fe510124c72b4a6377da659749fb95509b1c6104927b3d83382a6acb2f97cf9445ba0b680e9bab9b84aa8aa4be937a0f1036ca603"
+            }
+          ]
+        },
+        "validators": {
+          "validators": [
+            {
+              "pubKey": "299882cbfc52a66ed7463927500c99d4953d0d9fb1862c68ddc3e4a004fe4f8a",
+              "votingPower": 10
+            }
+          ]
+        },
+        "nextValidators": {
+          "validators": [
+            {
+              "pubKey": "299882cbfc52a66ed7463927500c99d4953d0d9fb1862c68ddc3e4a004fe4f8a",
+              "votingPower": 10
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "pin": {
+    "network": "local-embedded",
+    "chainId": "embedded.Directory",
+    "initialHeight": 1,
+    "genesisTime": {
+      "seconds": 1795822981,
+      "nanos": 0
+    },
+    "validators": {
+      "validators": [
+        {
+          "pubKey": "299882cbfc52a66ed7463927500c99d4953d0d9fb1862c68ddc3e4a004fe4f8a",
+          "votingPower": 10
+        }
+      ]
+    }
+  },
+  "book": "acc://s28cz-operand.acme/book",
+  "pageCount": 1
+}

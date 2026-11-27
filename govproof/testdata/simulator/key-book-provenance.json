@@ -1,0 +1,5 @@
+{
+  "command": "cd infrix-core && S28CZ_WRITE_KEY_BOOK_VECTOR=1 go test -count=1 -run TestS28czKeyPageOperandsAreProvenAtTheDirectoryRecordedRoot ./pkg/l0/proofcapture",
+  "label": "LOCAL-EMBEDDED fixture: verified only against its own pin passed explicitly; never a Kermit claim",
+  "source": "infrix-core's in-process embedded Accumulate network (pkg/devnet/embeddedl0, its own validator set as the consensus source): a genesis key book that never signed (it lists no chains) proven by the node's capture (proofcapture.Node.ProveKeyPageOperand, BookAtDirectoryRoot) from its historical state proof at the latest BPT root its partition anchored on the Directory, bound by the partition's BlockValidatorAnchor on the Directory anchor pool's main chain (infrix-core L3260)"
+}

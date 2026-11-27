@@ -257,7 +257,7 @@ func verifyAccountProof(p *KeyPageProof, opts l0proof.Options, kind string, deco
 	res.Verified = true
 	res.Form = FormLedger
 	res.Partition, res.Height, res.BlockTime = ledger.URL, ledger.Index, ledger.Time
-	res.RootAnchor = append([]byte(nil), p.LedgerState.Chains[p.LedgerState.Chain]...)
+	res.RootAnchor = append([]byte(nil), ls.ChainAnchor...)
 	res.DirectoryHeight = last.Header.Height
 	return res
 }
@@ -283,7 +283,7 @@ func directoryRoot(h *l0proof.DirectoryHop, start []byte, lim *l0proof.Limits) (
 	if err != nil {
 		return nil, fmt.Errorf("directory ledger: %v", err)
 	}
-	if !bytes.Equal(h.Ledger.Chains[h.Ledger.Chain], rootAnchor) {
+	if st.ChainAnchor == nil || !bytes.Equal(st.ChainAnchor, rootAnchor) {
 		return nil, fmt.Errorf("the Directory root anchor %X is not the Directory ledger's chain %d anchor", rootAnchor, h.Ledger.Chain)
 	}
 	if !strings.EqualFold(st.URL, l0proof.DirectoryLedgerURL) {

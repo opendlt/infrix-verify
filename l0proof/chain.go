@@ -189,7 +189,7 @@ func Verify(c *L0ProofChain, exp Expectation, opts Options) Result {
 	if err != nil {
 		return fail(res, "directory ledger: %v", err)
 	}
-	if !bytes.Equal(c.Directory.Ledger.Chains[c.Directory.Ledger.Chain], rootAnchor) {
+	if st.ChainAnchor == nil || !bytes.Equal(st.ChainAnchor, rootAnchor) {
 		return fail(res, "the Directory root anchor %X is not the Directory ledger's chain %d anchor", rootAnchor, c.Directory.Ledger.Chain)
 	}
 	if !sameURL(st.URL, DirectoryLedgerURL) {
@@ -264,6 +264,8 @@ type AccountState struct {
 	Root []byte // the partition BPT root the account's state is committed in
 	Type uint64 // the account type, read from its main state
 	URL  string // the account URL, read from its main state
+	// ChainAnchor is the anchor of the chain the proof hands up (Chains[Chain]); nil when the account lists no chains, which hands none up.
+	ChainAnchor []byte
 }
 
 // State recomputes the account's BPT value from its state (observedAccount.hashState: main state, secondary state, chains, pending), applies the BPT
@@ -282,8 +284,10 @@ func (a *AccountProof) State(lim *Limits) (*AccountState, error) {
 	if len(a.SecondaryState) != HashSize || len(a.Pending) != HashSize {
 		return nil, errors.New("the secondary-state and pending hashes must be 32 bytes")
 	}
-	if len(a.Chains) == 0 || len(a.Chains) > lim.MaxChains {
-		return nil, fmt.Errorf("the account lists %d chains; between 1 and %d are allowed", len(a.Chains), lim.MaxChains)
+	// an account Accumulate wrote with no chain yet (a genesis key page or key book that never signed) lists none: hashChains then hashes an
+	// empty list, the zero hash, which MerkleRoot reproduces; such an account hands no chain up the proof (infrix-core L3260)
+	if len(a.Chains) > lim.MaxChains {
+		return nil, fmt.Errorf("the account lists %d chains; at most %d are allowed", len(a.Chains), lim.MaxChains)
 	}
 	chains := make([][]byte, len(a.Chains))
 	for i, c := range a.Chains {
@@ -292,15 +296,22 @@ func (a *AccountProof) State(lim *Limits) (*AccountState, error) {
 		}
 		chains[i] = c
 	}
-	if a.Chain < 0 || a.Chain >= len(a.Chains) {
+	var chainAnchor []byte
+	switch {
+	case len(a.Chains) == 0 && a.Chain != 0:
+		return nil, fmt.Errorf("chain index %d names a chain of an account that lists none", a.Chain)
+	case len(a.Chains) == 0:
+	case a.Chain < 0 || a.Chain >= len(a.Chains):
 		return nil, fmt.Errorf("chain index %d is outside the account's %d chains", a.Chain, len(a.Chains))
+	default:
+		chainAnchor = a.Chains[a.Chain]
 	}
 	value := MerkleRoot([][]byte{sha(a.MainState), a.SecondaryState, MerkleRoot(chains), a.Pending})
 	root, err := a.StatePath.Apply(value, lim.MaxPathSteps)
 	if err != nil {
 		return nil, fmt.Errorf("state path: %w", err)
 	}
-	return &AccountState{Root: root, Type: typ, URL: url}, nil
+	return &AccountState{Root: root, Type: typ, URL: url, ChainAnchor: chainAnchor}, nil
 }
 
 // sameURL compares Accumulate URLs as the protocol does: case-insensitively (url.URL.Equal).

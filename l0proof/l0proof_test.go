@@ -288,7 +288,7 @@ func TestPF01_ProofsAreBoundedAndOversizedOnesAreRefusedByName(t *testing.T) {
 	over(func(l *l0proof.Limits) { l.MaxEntryItems = 0 }, "items, over the limit")
 	over(func(l *l0proof.Limits) { l.MaxTransactionBytes = 70 }, "over the limit of 70")
 	over(func(l *l0proof.Limits) { l.MaxMainStateBytes = 10 }, "main state is")
-	over(func(l *l0proof.Limits) { l.MaxChains = 1 }, "chains; between 1 and 1")
+	over(func(l *l0proof.Limits) { l.MaxChains = 1 }, "chains; at most 1")
 	over(func(l *l0proof.Limits) { l.Consensus.MaxValidators = 2 }, "over the limit of 2")
 	over(func(l *l0proof.Limits) { l.Consensus.MaxSteps = 0 }, "steps, over the limit of 0")
 	// bite: at the defaults the same chain verifies

@@ -152,7 +152,9 @@ func TestARule1BundlesSwappedOutcomeDigestChangesNoLevelAndIsNamedUnsealed(t *te
 	}
 	// the same bundle under rule 2 binds its plan through its sealed outcome digest
 	r = Verify(context.Background(), buildPortableWith(t, true, [32]byte{7}, "outcome-vk", func(b *evidence.EvidenceBundle) { b.ApprovalEvidence = nil },
-		func(b *evidence.EvidenceBundle, in *evidence.BuildPortablePackageInputs) { in.PlanHash = b.OutcomeDigest }), Options{})
+		func(b *evidence.EvidenceBundle, in *evidence.BuildPortablePackageInputs) {
+			in.PlanHash = b.OutcomeDigest
+		}), Options{})
 	if checkStatus(r, "plan_hash_binding") != CheckPass || !r.OutcomeDigestSealed {
 		t.Fatalf("rule-2 subsystem-attributed: plan_hash_binding=%s sealed=%v", detail(r, "plan_hash_binding"), r.OutcomeDigestSealed)
 	}

@@ -31,17 +31,17 @@ func fixtureBytes(f *testing.F) (sigs [][]byte, ledger []byte) {
 	return sigs, fx.Execution.Page.LedgerState.MainState
 }
 
-func FuzzDecodeED25519Signature(f *testing.F) {
+func FuzzDecodeUserSignature(f *testing.F) {
 	sigs, _ := fixtureBytes(f)
 	for _, s := range sigs {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, b []byte) {
-		s, err := decodeED25519Signature(b)
+		s, err := decodeUserSignature(b)
 		if err != nil {
 			return
 		}
-		if len(s.PublicKey) != 32 || len(s.Signature) != 64 || s.Signer == "" || len(s.Metadata) >= len(b) {
+		if s.Type == "" || len(s.PublicKey) == 0 || len(s.Signature) == 0 || s.Signer == "" || len(s.Metadata) >= len(b) {
 			t.Fatalf("a decoded signature broke its invariants: %+v", s)
 		}
 	})

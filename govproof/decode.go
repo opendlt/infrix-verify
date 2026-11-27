@@ -20,7 +20,6 @@ import (
 // Accumulate protocol enum values (protocol/enums_gen.go).
 const (
 	accountTypeSystemLedger = 14
-	signatureTypeED25519    = 2
 	voteTypeAccept          = 0
 )
 
@@ -144,25 +143,36 @@ func decodeSystemLedger(main []byte) (*systemLedger, error) {
 	return l, nil
 }
 
-// ed25519Sig is an Accumulate ED25519Signature (protocol.ED25519Signature: 1 type, 2 publicKey, 3 signature, 4 signer, 5 signerVersion, 6 timestamp,
-// 7 vote, 8 transactionHash, 9 memo, 10 data), with Metadata the encoding Accumulate hashes for the signature's metadata (Metadata(): the signature and
-// the transaction hash cleared, so fields 3 and 8 omitted), cut from the carried bytes.
-type ed25519Sig struct {
+// userSig is an Accumulate user signature of one of the types this verifier checks (userSignatureTypes). Every type but legacyED25519 encodes
+// 1 type, 2 publicKey, 3 signature, 4 signer, 5 signerVersion, 6 timestamp, 7 vote, 8 transactionHash, 9 memo, 10 data; legacyED25519 encodes
+// 1 type, 2 timestamp, 3 publicKey, 4 signature, 5 signer, 6 signerVersion, 7 vote, 8 transactionHash. Metadata is the encoding Accumulate hashes
+// for the signature's metadata (Metadata(): the signature value and the transaction hash cleared, so those fields omitted), cut from the carried bytes.
+type userSig struct {
+	Type          string
 	PublicKey     []byte
 	Signature     []byte
 	Signer        string
 	SignerVersion uint64
+	Timestamp     uint64
 	Vote          uint64
 	TxHash        []byte // field 8, when present
 	Metadata      []byte
 }
 
-func decodeED25519Signature(b []byte) (*ed25519Sig, error) {
+// userSigFields names a type family's field numbers.
+type userSigFields struct{ pub, sig, signer, version, timestamp uint64 }
+
+var (
+	userSigLayout   = userSigFields{pub: 2, sig: 3, signer: 4, version: 5, timestamp: 6}
+	legacySigLayout = userSigFields{pub: 3, sig: 4, signer: 5, version: 6, timestamp: 2}
+)
+
+func decodeUserSignature(b []byte) (*userSig, error) {
 	r := &reader{b: b}
-	s := &ed25519Sig{}
+	s := &userSig{}
 	var prev uint64
-	sawType := false
 	keep := make([]byte, 0, len(b))
+	var lay userSigFields
 	for !r.done() {
 		start := r.off
 		f, err := r.next(prev, "signature")
@@ -170,62 +180,70 @@ func decodeED25519Signature(b []byte) (*ed25519Sig, error) {
 			return nil, err
 		}
 		prev = f
-		switch f {
-		case 1:
+		if f != 1 && s.Type == "" {
+			return nil, errors.New("the signature has no type")
+		}
+		switch {
+		case f == 1:
 			t, err := r.uvarint("signature type")
 			if err != nil {
 				return nil, err
 			}
-			if t != signatureTypeED25519 {
-				return nil, fmt.Errorf("the signature is type %d; only ED25519 (%d) is verified", t, signatureTypeED25519)
+			name, ok := userSignatureTypeName(t)
+			if !ok {
+				return nil, fmt.Errorf("the signature is type %d; the verified user signature types are %v", t, UserSignatureTypeNames())
 			}
-			sawType = true
-		case 2:
+			s.Type = name
+			lay = userSigLayout
+			if name == "legacyED25519" {
+				lay = legacySigLayout
+			}
+		case f == lay.pub:
 			if s.PublicKey, err = r.bytes("signature public key"); err != nil {
 				return nil, err
 			}
-		case 3:
+		case f == lay.sig:
 			if s.Signature, err = r.bytes("signature value"); err != nil {
 				return nil, err
 			}
-		case 4:
+		case f == lay.signer:
 			u, err := r.bytes("signature signer")
 			if err != nil {
 				return nil, err
 			}
 			s.Signer = string(u)
-		case 5:
+		case f == lay.version:
 			if s.SignerVersion, err = r.uvarint("signature signer version"); err != nil {
 				return nil, err
 			}
-		case 6:
-			if _, err := r.uvarint("signature timestamp"); err != nil {
+		case f == lay.timestamp:
+			if s.Timestamp, err = r.uvarint("signature timestamp"); err != nil {
 				return nil, err
 			}
-		case 7:
+		case f == 7:
 			if s.Vote, err = r.uvarint("signature vote"); err != nil {
 				return nil, err
 			}
-		case 8:
+		case f == 8:
 			if s.TxHash, err = r.raw(32, "signature transaction hash"); err != nil {
 				return nil, err
 			}
-		case 9, 10:
+		case (f == 9 || f == 10) && s.Type != "legacyED25519":
 			if _, err := r.bytes("signature memo/data"); err != nil {
 				return nil, err
 			}
 		default:
-			return nil, fmt.Errorf("the signature has unknown field %d", f)
+			return nil, fmt.Errorf("the %s signature has unknown field %d", s.Type, f)
 		}
-		if f != 3 && f != 8 {
+		if f != lay.sig && f != 8 {
 			keep = append(keep, b[start:r.off]...)
 		}
 	}
-	if !sawType {
+	if s.Type == "" {
 		return nil, errors.New("the signature has no type")
 	}
-	if len(s.PublicKey) != 32 || len(s.Signature) != 64 {
-		return nil, fmt.Errorf("an ED25519 signature needs a 32-byte key and a 64-byte signature (have %d and %d)", len(s.PublicKey), len(s.Signature))
+	if len(s.PublicKey) == 0 || len(s.Signature) == 0 {
+		return nil, fmt.Errorf("the %s signature carries no key or no signature value", s.Type)
 	}
 	if s.Signer == "" {
 		return nil, errors.New("the signature names no signer")

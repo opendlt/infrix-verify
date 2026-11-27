@@ -26,7 +26,6 @@ package govproof
 
 import (
 	"bytes"
-	"crypto/ed25519"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -80,10 +79,10 @@ func (p *KeyPage) Has(keyHash []byte) bool {
 
 // KeyPageResult is the verdict on a key-page proof. Verified is true only when every link was checked; otherwise Reason names the first that failed.
 type KeyPageResult struct {
-	Verified        bool
-	Reason          string
-	Pin             string
-	PinOverridden   bool
+	Verified      bool
+	Reason        string
+	Pin           string
+	PinOverridden bool
 	// Form is FormLedger or FormDirectoryRoot.
 	Form            string
 	Page            KeyPage
@@ -383,12 +382,13 @@ func VerifyGovernance(g *GovernanceExecution, exp GovernanceExpectation, opts l0
 	return GovernanceResult{Verified: true, Pin: chain.Pin, TxHash: chain.TxHash, Height: kp.Height, Signers: len(seen), Threshold: kp.Page.AcceptThreshold}
 }
 
-// checkSignature verifies one accepted signature the way Accumulate's executor does (protocol.ED25519Signature.Verify through verifySig): ED25519 over
-// SHA-256(SHA-256(metadata) ‖ txHash), the metadata being the signature with its value and transaction hash cleared. The signer must be the proven page at
-// its proven version, the vote an acceptance, and the key on the page. It returns the key's hash (protocol.PublicKeyHash for ED25519: SHA-256 of the key).
+// checkSignature verifies one accepted signature the way Accumulate's executor does (protocol.<Type>Signature.Verify through verifySig), for every
+// user signature type an approval and its governance half may be signed as (VerifyUserSignature over SHA-256 of the metadata, the metadata being the
+// signature with its value and transaction hash cleared). The signer must be the proven page at its proven version, the vote an acceptance, and the
+// key on the page by the hash Accumulate computes for the type. It returns the key's hash (protocol.PublicKeyHash: KeyHash).
 // Accumulate also accepts a signature over the initiator's merkle hash; a capture records the metadata form, and this verifier credits only that form.
 func checkSignature(raw []byte, txHash []byte, page *KeyPage) ([]byte, error) {
-	s, err := decodeED25519Signature(raw)
+	s, err := decodeUserSignature(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -405,13 +405,15 @@ func checkSignature(raw []byte, txHash []byte, page *KeyPage) ([]byte, error) {
 		return nil, errors.New("the signature names a different transaction")
 	}
 	md := sha256.Sum256(s.Metadata)
-	msg := sha256.Sum256(append(md[:], txHash...))
-	if !ed25519.Verify(s.PublicKey, msg[:], s.Signature) {
-		return nil, errors.New("the ED25519 signature does not verify over the transaction")
+	if err := VerifyUserSignature(s.Type, s.PublicKey, s.Signature, md[:], txHash, s.Timestamp); err != nil {
+		return nil, fmt.Errorf("%w over the transaction", err)
 	}
-	kh := sha256.Sum256(s.PublicKey)
-	if !page.Has(kh[:]) {
-		return nil, fmt.Errorf("key %X is not on the proven page %s", kh[:], page.URL)
+	kh, err := KeyHash(s.Type, s.PublicKey)
+	if err != nil {
+		return nil, err
 	}
-	return kh[:], nil
+	if !page.Has(kh) {
+		return nil, fmt.Errorf("%s key %X is not on the proven page %s", s.Type, kh, page.URL)
+	}
+	return kh, nil
 }

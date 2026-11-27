@@ -15,9 +15,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	secpecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/opendlt/infrix-schema/evidence"
+
+	"github.com/opendlt/infrix-verify/govproof"
 )
 
 // THE APPROVAL SIGNATURE CHECK (brief 28bd row 1, L2992).
@@ -224,56 +224,15 @@ func verifyApprovalSignature(ae evidence.ApprovalEvidenceRef, planHash [32]byte)
 		return fmt.Errorf("an %s approval needs its %d-byte signature metadata hash", ae.SigType, sha256.Size)
 	}
 	approvalHash := sha256.Sum256(ae.SignedPreimage)
-	// Accumulate's verifySig: the signed message is metadataHash || messageHash, hashed once with SHA-256.
-	msg := append(append([]byte(nil), ae.SignatureMetadataHash...), approvalHash[:]...)
-	digest := sha256.Sum256(msg)
-	switch accType {
-	case "ed25519":
-		if len(ae.PublicKey) != ed25519.PublicKeySize || len(ae.Signature) != ed25519.SignatureSize {
-			return fmt.Errorf("an %s approval needs a %d-byte key and a %d-byte signature", ae.SigType, ed25519.PublicKeySize, ed25519.SignatureSize)
+	// Accumulate's verifySig, by type (govproof.VerifyUserSignature: every user signature type an approval may be signed as): the signed message is
+	// metadataHash || approvalHash (with the signature timestamp between them for legacyED25519), hashed once with SHA-256.
+	if err := govproof.VerifyUserSignature(accType, ae.PublicKey, ae.Signature, ae.SignatureMetadataHash, approvalHash[:], pre.SignatureTimestamp); err != nil {
+		if errors.Is(err, govproof.ErrUserSignatureTypeUnknown) {
+			return fmt.Errorf("%w: %v", errApprovalUncheckable, err)
 		}
-		if !ed25519.Verify(ed25519.PublicKey(ae.PublicKey), digest[:], ae.Signature) {
-			return fmt.Errorf("the %s signature does not verify", ae.SigType)
-		}
-		return nil
-	case "btc":
-		pk, err := secp256k1.ParsePubKey(ae.PublicKey)
-		if err != nil {
-			return fmt.Errorf("the %s public key does not parse: %v", ae.SigType, err)
-		}
-		sig, err := secpecdsa.ParseDERSignature(ae.Signature)
-		if err != nil {
-			return fmt.Errorf("the %s signature is not strict DER: %v", ae.SigType, err)
-		}
-		if !sig.Verify(digest[:], pk) {
-			return fmt.Errorf("the %s signature does not verify", ae.SigType)
-		}
-		return nil
-	case "eth":
-		pk, err := secp256k1.ParsePubKey(ae.PublicKey)
-		if err != nil {
-			return fmt.Errorf("the %s public key does not parse: %v", ae.SigType, err)
-		}
-		if len(ae.Signature) != 64 && len(ae.Signature) != 65 {
-			return fmt.Errorf("an %s signature is 64 or 65 bytes (r||s[||v]), got %d", ae.SigType, len(ae.Signature))
-		}
-		var r, s secp256k1.ModNScalar
-		if overflow := r.SetByteSlice(ae.Signature[:32]); overflow || r.IsZero() {
-			return fmt.Errorf("the %s signature's r is out of range", ae.SigType)
-		}
-		if overflow := s.SetByteSlice(ae.Signature[32:64]); overflow || s.IsZero() {
-			return fmt.Errorf("the %s signature's s is out of range", ae.SigType)
-		}
-		// Accumulate verifies an eth signature with go-ethereum's VerifySignature, which refuses the malleable upper-half s.
-		if s.IsOverHalfOrder() {
-			return fmt.Errorf("the %s signature has a malleable upper-half s", ae.SigType)
-		}
-		if !secpecdsa.NewSignature(&r, &s).Verify(digest[:], pk) {
-			return fmt.Errorf("the %s signature does not verify", ae.SigType)
-		}
-		return nil
+		return fmt.Errorf("the %s approval: %w", ae.SigType, err)
 	}
-	return fmt.Errorf("%w: the Accumulate %q signature type is not one this verifier checks (ed25519, btc, eth)", errApprovalUncheckable, accType)
+	return nil
 }
 
 // approvalsVerdict checks every approval in the bundle against planHash. signed is true only when there is at least one approval

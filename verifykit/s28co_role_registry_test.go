@@ -148,7 +148,7 @@ func TestS28coAPolicyReadingActorRoleIsReevaluatedFromTheProvenRegistry(t *testi
 	}
 	run := func(b *evidence.EvidenceBundle) (bool, *Check) {
 		r := &Report{}
-		ok := r.checkPolicyReevaluation(b, true, nil, [32]byte{})
+		ok := r.checkPolicyReevaluation(b, true, nil, [32]byte{}, Options{})
 		for i := range r.Checks {
 			if r.Checks[i].Name == "policy_reevaluation" {
 				return ok, &r.Checks[i]

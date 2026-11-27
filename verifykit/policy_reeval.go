@@ -8,7 +8,11 @@ package verifykit
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/opendlt/infrix-verify/govproof"
 
 	"github.com/opendlt/infrix-schema/evidence"
 	"github.com/opendlt/infrix-schema/policyeval"
@@ -40,7 +44,7 @@ type PolicyReevaluation struct {
 // (brief 28bu row 2, the L3008 (b) ruling): planHash must equal evidence.BindPlanHash(bundle.PlanContentHash, the evaluations). A bundle
 // whose subjects are not bound is a SKIP that credits no G0 (an approved plan's subjects are node-asserted otherwise); a binding that does not
 // recompute FAILS (the subjects or the policies are not the ones the approvals signed).
-func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed bool, pins map[string][32]byte, planHash [32]byte) bool {
+func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed bool, pins map[string][32]byte, planHash [32]byte, opts Options) bool {
 	const name = "policy_reevaluation"
 	if !parsed {
 		r.add(name, CheckFail, "bundle did not parse")
@@ -63,6 +67,14 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 			r.add(name, CheckFail, fmt.Sprintf("the role registry proof does not verify against the bundle's state root: %v", err))
 			return false
 		}
+	}
+	// actor::has_key is answered through the node's own body (policyeval.ResolveActorHasKey) from the key pages the bundle proves under the pin
+	// (infrix-core L3196): a page proof that does not verify FAILS; a page it does not prove leaves actor::has_key unproven (an account's absence
+	// is not provable from Accumulate's receipts)
+	provenPages, err := verifiedKeyPages(bundle, opts)
+	if err != nil {
+		r.add(name, CheckFail, err.Error())
+		return false
 	}
 	provedActors := 0
 
@@ -95,7 +107,7 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 		if proven {
 			provedActors++
 		}
-		out, err := doc.Decide(&policyeval.ProvenRolesContext{Subject: subjectOf(ev.Subject), ActorRoles: roles, ActorProven: proven})
+		out, err := doc.Decide(&policyeval.ProvenRolesContext{Subject: subjectOf(ev.Subject), ActorRoles: roles, ActorProven: proven, ProvenPages: provenPages})
 		if err != nil {
 			if undecided == "" {
 				undecided = fmt.Sprintf("policy %d (%s) cannot be re-evaluated offline: %v", i, ev.PolicyType, err)
@@ -171,4 +183,27 @@ func (r *Report) checkPolicyReevaluation(bundle *evidence.EvidenceBundle, parsed
 
 func subjectOf(s evidence.PolicySubject) policyeval.Subject {
 	return policyeval.Subject{Actor: s.Actor, Contract: s.Contract, Function: s.Function, BlockHeight: s.BlockHeight, Amount: s.Amount}
+}
+
+// verifiedKeyPages is the set of key pages (URL, lower case) the bundle proves under the verifier's pin, from its approval pages (KeyPageProofs)
+// and the pages its policies read (OperandPageProofs): every proof is verified (govproof.VerifyKeyPage), a proof that does not verify is an
+// error, and a proof captured under a pin this verifier does not hold proves nothing.
+func verifiedKeyPages(bundle *evidence.EvidenceBundle, opts Options) (map[string]bool, error) {
+	pages := map[string]bool{}
+	all := append(append([]json.RawMessage(nil), bundle.KeyPageProofs...), bundle.OperandPageProofs...)
+	for i, raw := range all {
+		var p govproof.KeyPageProof
+		if err := decodeStrict(raw, &p); err != nil {
+			return nil, fmt.Errorf("key-page proof %d: %v", i, err)
+		}
+		if _, unheld := unheldPin(p.Incarnation, opts); unheld {
+			continue
+		}
+		res := govproof.VerifyKeyPage(&p, l0Opts(opts))
+		if !res.Verified {
+			return nil, fmt.Errorf("key-page proof %d: %s", i, res.Reason)
+		}
+		pages[strings.ToLower(res.Page.URL)] = true
+	}
+	return pages, nil
 }

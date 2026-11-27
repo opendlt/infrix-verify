@@ -388,7 +388,7 @@ func Verify(ctx context.Context, pkg *evidence.PortableEvidencePackage, opts Opt
 
 	// G0 is credited from this verifier's own re-evaluation of the bundle's content-addressed policies, never from a recorded decision
 	// (brief 28bi, native proof plan phase 6).
-	policyAllowed := report.checkPolicyReevaluation(&bundle, bundleParsed, opts.PinnedPolicies, pkg.PlanHash)
+	policyAllowed := report.checkPolicyReevaluation(&bundle, bundleParsed, opts.PinnedPolicies, pkg.PlanHash, opts)
 
 	// "Anchored" is the Merkle inclusion of the bundle hash THIS verifier recomputes into the batch root the anchor record names
 	// (brief 28bd row 2). The node-set anchorStatus field is never read for it.

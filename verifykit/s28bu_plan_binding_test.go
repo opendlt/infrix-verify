@@ -26,7 +26,7 @@ func TestS28buTheReevaluatedSubjectsMustBindIntoThePlanHashTheApprovalsSigned(t 
 	signed := evidence.BindPlanHash(content, evals())
 	run := func(b *evidence.EvidenceBundle, planHash [32]byte) (bool, CheckStatus, string) {
 		r := &Report{}
-		ok := r.checkPolicyReevaluation(b, true, nil, planHash)
+		ok := r.checkPolicyReevaluation(b, true, nil, planHash, Options{})
 		st, d := checkResult(r, "policy_reevaluation")
 		return ok, st, d
 	}
